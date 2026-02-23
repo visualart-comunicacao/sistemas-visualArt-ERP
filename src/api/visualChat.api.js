@@ -25,7 +25,7 @@ export async function listTicketMessages(ticketId, params = {}) {
 
 // POST /inbox/tickets/:ticketId/assign body: { userId?: string|null }
 export async function assignTicket(ticketId) {
-  const res = await http.post(`/inbox/tickets/${ticketId}/assign`)
+  const res = await http.patch(`/inbox/tickets/${ticketId}/assign`)
   return res.data // { ticket }
 }
 // POST /inbox/tickets/:ticketId/close
@@ -123,6 +123,10 @@ export function openInboxStream() {
   const base = env.API_URL
   const url = `${base}/inbox/stream?access_token=${encodeURIComponent(token)}`
 
-  console.log('[VisualChat.api] SSE connecting:', url)
   return new EventSource(url)
+}
+
+export async function updateContact(contactId, data) {
+  const res = await http.patch(`/inbox/contacts/${contactId}`, data)
+  return res.data // { contact }
 }

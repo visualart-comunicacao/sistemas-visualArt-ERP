@@ -273,6 +273,7 @@ export default function VisualChatPage() {
     if (shouldAutoAssign) {
       try {
         const assignResp = await assignTicket(activeThreadId)
+        setQueue('Meus')
         const assignedTicket = assignResp?.ticket || null
 
         if (assignedTicket) {
@@ -407,6 +408,22 @@ export default function VisualChatPage() {
         onNewConversation={() => setNewOpen(true)}
         queue={queue}
         onChangeQueue={setQueue}
+        onContactUpdated={(updated) => {
+          if (!updated?.id) return
+          contactsRef.current.set(updated.id, {
+            id: updated.id,
+            name: updated.name || null,
+            phone: updated.phoneE164 || updated.phone || null,
+            waId: updated.waId || null,
+          })
+
+          // atualiza título do ticket atual (e de todos que sejam desse contato)
+          setThreads((prev) =>
+            prev.map((t) =>
+              t.contactId === updated.id ? { ...t, title: updated.name || t.title } : t,
+            ),
+          )
+        }}
       />
 
       <FloatButton

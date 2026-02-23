@@ -34,6 +34,7 @@ export default function ChatShell({
   onChangeQueue,
 
   onNewConversation,
+  onContactUpdated,
 }) {
   const [showRight, setShowRight] = useState(true)
 
@@ -80,7 +81,7 @@ export default function ChatShell({
       </div>
 
       <div className="vc-panel vc-right">
-        <ContactInfoPanel contact={contact} />
+        <ContactInfoPanel contact={contact} onContactUpdated={onContactUpdated} />
       </div>
     </div>
   )

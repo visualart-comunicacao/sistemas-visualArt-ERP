@@ -1,13 +1,39 @@
-import React from 'react'
-import { Divider, Typography } from 'antd'
+import React, { useEffect, useState } from 'react'
+import { Button, Input, Space, Typography, message as antdMessage } from 'antd'
+import { updateContact } from '@/api/visualChat.api'
 
-const { Title, Text } = Typography
+const { Text, Title } = Typography
 
-export default function ContactInfoPanel({ contact }) {
+export default function ContactInfoPanel({ contact, onContactUpdated }) {
+  const [name, setName] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setName(contact?.name || '')
+  }, [contact?.id])
+
+  async function onSave() {
+    if (!contact?.id) return
+    const nextName = String(name || '').trim()
+    setSaving(true)
+    try {
+      const resp = await updateContact(contact.id, { name: nextName || null })
+      const updated = resp?.contact || null
+      antdMessage.success('Contato atualizado!')
+      onContactUpdated?.(updated)
+    } catch (err) {
+      antdMessage.error('Não foi possível salvar o contato.')
+      console.error(err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (!contact) {
     return (
       <div style={{ padding: 16 }}>
-        <Text type="secondary">Selecione uma conversa para ver detalhes.</Text>
+        <Title level={5}>Informações</Title>
+        <Text type="secondary">Selecione uma conversa.</Text>
       </div>
     )
   }
@@ -18,20 +44,32 @@ export default function ContactInfoPanel({ contact }) {
         Informações
       </Title>
 
-      <Divider />
-
-      <div style={{ display: 'grid', gap: 8 }}>
-        <Text>
-          <b>Nome:</b> {contact.name}
-        </Text>
-        <Text>
-          <b>Telefone:</b> {contact.phone}
-        </Text>
+      <div style={{ marginTop: 12 }}>
+        <Text strong>Nome</Text>
+        <Input
+          style={{ marginTop: 6 }}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Ex: João - Loja X"
+        />
       </div>
 
-      <Divider />
+      <div style={{ marginTop: 12 }}>
+        <Text strong>Telefone</Text>
+        <div style={{ marginTop: 6 }}>
+          <Text>{contact.phone || contact.phoneE164 || '—'}</Text>
+        </div>
+      </div>
 
-      <Text type="secondary">Aqui depois entra: etiquetas, histórico, arquivos, etc.</Text>
+      <Space style={{ marginTop: 16 }}>
+        <Button type="primary" onClick={onSave} loading={saving}>
+          Salvar
+        </Button>
+      </Space>
+
+      <div style={{ marginTop: 18 }}>
+        <Text type="secondary">Depois a gente adiciona tags, notas e avatar aqui.</Text>
+      </div>
     </div>
   )
 }

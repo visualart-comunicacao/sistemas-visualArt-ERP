@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { Button, Input, Popover, Space, Switch, Typography } from 'antd'
 import { SendOutlined, PaperClipOutlined, AudioOutlined, SmileOutlined } from '@ant-design/icons'
+import VoiceRecorderButton from './VoiceRecorderButton' // ajuste o path
 
 const { Text } = Typography
 
@@ -40,7 +41,8 @@ function EmojiPicker({ onPick }) {
   )
 }
 
-export default function Composer({ onSend, onSendImageMock, disabled }) {
+// ✅ Agora recebe ticketId
+export default function Composer({ ticketId, onSend, onSendImageMock, disabled }) {
   const [text, setText] = useState('')
   const [internalNote, setInternalNote] = useState(false)
   const [sending, setSending] = useState(false)
@@ -60,8 +62,10 @@ export default function Composer({ onSend, onSendImageMock, disabled }) {
 
   const emojiContent = useMemo(() => <EmojiPicker onPick={(e) => setText((t) => t + e)} />, [])
 
+  // const audioDisabled = disabled || sending || !ticketId
+  const audioDisabled = false
+
   return (
-    // ✅ impede reload por submit/Enter em qualquer cenário
     <form
       onSubmit={(e) => {
         e.preventDefault()
@@ -78,7 +82,7 @@ export default function Composer({ onSend, onSendImageMock, disabled }) {
               icon={<PaperClipOutlined />}
               onClick={() => onSendImageMock?.()}
               disabled={disabled || sending}
-              htmlType="button" // ✅ nunca submit
+              htmlType="button"
             />
             <Text type="secondary">Anexar (mock)</Text>
           </Space>
@@ -101,7 +105,6 @@ export default function Composer({ onSend, onSendImageMock, disabled }) {
               disabled ? 'Selecione uma conversa para enviar...' : 'Digite uma mensagem...'
             }
             disabled={disabled || sending}
-            // ✅ mais confiável que onPressEnter
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
@@ -111,8 +114,10 @@ export default function Composer({ onSend, onSendImageMock, disabled }) {
             }}
           />
 
-          <Button icon={<AudioOutlined />} disabled={disabled || sending} htmlType="button" />
+          {/* ✅ Botão de áudio separado (grava e envia) */}
+          <VoiceRecorderButton ticketId={ticketId} disabled={audioDisabled} />
 
+          {/* ✅ Botão enviar texto */}
           <Button
             type="primary"
             icon={<SendOutlined />}
@@ -123,11 +128,18 @@ export default function Composer({ onSend, onSendImageMock, disabled }) {
             }}
             disabled={disabled || sending}
             loading={sending}
-            htmlType="button" // ✅ nunca submit
+            htmlType="button"
           >
             Enviar
           </Button>
         </Space.Compact>
+
+        {/* Opcional: dica quando não tem ticket selecionado */}
+        {!ticketId && !disabled ? (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Selecione uma conversa para habilitar o áudio.
+          </Text>
+        ) : null}
       </Space>
     </form>
   )

@@ -2,6 +2,8 @@ import React, { useMemo } from 'react'
 import { Avatar, Tooltip } from 'antd'
 import dayjs from 'dayjs'
 import './MessageBubble.css'
+import AudioMessageBubble from './AudioMessageBubble' // ajuste o path
+import { env } from '@/app/config/env' // ajuste se necessário
 
 // =========================
 // Helpers
@@ -36,8 +38,23 @@ function isHttpUrl(s) {
   return /^https?:\/\/\S+$/i.test(s)
 }
 
+// ✅ monta URL absoluta quando vier /uploads/...
+function toAbsoluteUrl(url) {
+  const u = String(url || '').trim()
+  if (!u) return ''
+  if (isHttpUrl(u)) return u
+
+  // se vier /uploads/voices/...
+  if (u.startsWith('/')) {
+    const base = String(env?.API_URL || '').replace(/\/$/, '')
+    return `${base}${u}`
+  }
+
+  // fallback
+  return u
+}
+
 function renderRichText(text = '') {
-  // quebra por URLs e mantém texto normal com \n
   const parts = String(text).split(/(https?:\/\/\S+)/g)
   return parts.map((p, idx) => {
     if (isHttpUrl(p)) {
@@ -48,7 +65,6 @@ function renderRichText(text = '') {
       )
     }
 
-    // preserva quebras de linha
     const lines = p.split('\n')
     return (
       <React.Fragment key={idx}>
@@ -81,9 +97,18 @@ function StatusMark({ status, errorText }) {
   return null
 }
 
+// ===================================
+// Attachment (atualizado p/ áudio UI)
+// ===================================
 function Attachment({ message }) {
-  const type = String(message?.type || '').toLowerCase()
-  const url = message?.url || message?.mediaUrl || message?.attachmentUrl || null
+  // seu backend pode mandar: "AUDIO" ou "audio"
+  const type = String(message?.type || '')
+    .trim()
+    .toLowerCase()
+
+  // seus possíveis campos
+  const rawUrl = message?.url || message?.mediaUrl || message?.attachmentUrl || null
+  const url = rawUrl ? toAbsoluteUrl(rawUrl) : null
   const caption = message?.caption || null
 
   if (!url) return null
@@ -92,7 +117,6 @@ function Attachment({ message }) {
     return (
       <div className="va-attach va-attach-image">
         <a href={url} target="_blank" rel="noreferrer">
-          {/* img simples; se quiser, depois a gente põe lightbox */}
           <img className="va-attach-img" src={url} alt={caption || 'imagem'} />
         </a>
         {caption ? <div className="va-attach-caption">{renderRichText(caption)}</div> : null}
@@ -100,10 +124,11 @@ function Attachment({ message }) {
     )
   }
 
+  // ✅ Aqui: áudio com bubble estilo WhatsApp
   if (type === 'audio') {
     return (
       <div className="va-attach va-attach-audio">
-        <audio controls src={url} style={{ width: '100%' }} />
+        <AudioMessageBubble src={url} durationMs={message?.durationMs} />
       </div>
     )
   }
@@ -142,13 +167,9 @@ export default function MessageBubble({ message, isMe, contact, user }) {
   const displayName = isMe ? user?.name : contact?.name
   const initials = useMemo(() => getInitials(displayName), [displayName])
 
-  // createdAt pode vir como createdAt ou at (você usa at na normalização)
   const time = safeTime(message?.createdAt) || safeTime(message?.at)
 
-  // fallback: se tiver anexo e sem texto, não renderiza texto vazio
   const hasText = String(text || '').trim().length > 0
-
-  // opcional: erro para tooltip em FAILED (se você guardar)
   const errorText = message?.error || message?.errorMessage || message?.details?.message
 
   return (
