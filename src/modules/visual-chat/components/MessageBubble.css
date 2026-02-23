@@ -1,0 +1,171 @@
+.va-msg-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.va-msg-row.va-me {
+  justify-content: flex-end;
+}
+
+.va-msg-row.va-them {
+  justify-content: flex-start;
+}
+
+/* Bolha base */
+.va-msg-bubble {
+  max-width: 62%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #e6f4ea;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+  position: relative;
+}
+
+.va-msg-row.va-them .va-msg-bubble {
+  background: #f5f5f5;
+}
+
+/* "Cauda" tipo Whats (bem sutil) */
+.va-tail-right::after,
+.va-tail-left::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  width: 10px;
+  height: 10px;
+}
+
+.va-tail-right::after {
+  right: -1px;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0) 50%, #e6f4ea 50%);
+}
+
+.va-msg-row.va-them .va-tail-left::after {
+  left: -1px;
+  background: linear-gradient(225deg, rgba(0, 0, 0, 0) 50%, #f5f5f5 50%);
+}
+
+/* Texto */
+.va-msg-text {
+  white-space: pre-wrap;
+  /* respeita \n */
+  word-break: break-word;
+  line-height: 1.35;
+}
+
+/* Links */
+.va-msg-link {
+  color: #1677ff;
+  text-decoration: none;
+}
+
+.va-msg-link:hover {
+  text-decoration: underline;
+}
+
+/* Emoji-only */
+.va-msg-bubble.va-emoji-only {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 2px 4px;
+}
+
+.va-msg-bubble.va-emoji-only .va-msg-text {
+  font-size: 42px;
+  line-height: 1.1;
+}
+
+/* Meta (hora + status) */
+.va-msg-meta {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.65;
+}
+
+.va-msg-time {
+  user-select: none;
+}
+
+/* Status */
+.va-status-sent {
+  user-select: none;
+}
+
+.va-status-delivered {
+  user-select: none;
+}
+
+.va-status-read {
+  color: #1677ff;
+  user-select: none;
+}
+
+.va-status-failed {
+  color: #ff4d4f;
+  font-weight: 700;
+  user-select: none;
+}
+
+/* Mensagem optimista (enviando) */
+.va-optimistic {
+  opacity: 0.75;
+}
+
+/* =========================
+   Anexos (imagem/áudio/doc)
+   ========================= */
+.va-attach {
+  margin-bottom: 6px;
+}
+
+.va-attach-image {
+  max-width: 320px;
+}
+
+.va-attach-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.va-attach-img:hover {
+  filter: brightness(0.98);
+}
+
+.va-attach-caption {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.va-attach-audio audio {
+  width: 100%;
+}
+
+.va-attach-doc {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.va-attach-doclink {
+  display: inline-block;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.04);
+  text-decoration: none;
+  color: inherit;
+}
+
+.va-attach-doclink:hover {
+  background: rgba(0, 0, 0, 0.06);
+}

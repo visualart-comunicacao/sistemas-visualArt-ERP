@@ -24,11 +24,10 @@ export async function listTicketMessages(ticketId, params = {}) {
 }
 
 // POST /inbox/tickets/:ticketId/assign body: { userId?: string|null }
-export async function assignTicket(ticketId, body = {}) {
-  const { data } = await http.post(`/inbox/tickets/${ticketId}/assign`, body)
-  return data
+export async function assignTicket(ticketId) {
+  const res = await http.post(`/inbox/tickets/${ticketId}/assign`)
+  return res.data // { ticket }
 }
-
 // POST /inbox/tickets/:ticketId/close
 export async function closeTicket(ticketId) {
   const { data } = await http.post(`/inbox/tickets/${ticketId}/close`)

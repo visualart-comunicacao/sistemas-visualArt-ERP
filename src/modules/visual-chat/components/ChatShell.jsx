@@ -28,6 +28,12 @@ export default function ChatShell({
   onChangeTicket,
   onTransfer,
   onShare,
+
+  // ✅ vindo do VisualChatPage (opção 1)
+  queue,
+  onChangeQueue,
+
+  onNewConversation,
 }) {
   const [showRight, setShowRight] = useState(true)
 
@@ -41,6 +47,9 @@ export default function ChatShell({
           threads={threads}
           activeThreadId={activeThreadId}
           onSelectThread={onSelectThread}
+          onNewConversation={onNewConversation}
+          queue={queue}
+          onChangeQueue={onChangeQueue}
         />
       </div>
 
@@ -58,7 +67,7 @@ export default function ChatShell({
         </div>
 
         <div className="vc-messages">
-          <MessagesList messages={messages} />
+          <MessagesList messages={messages} activeContact={contact} currentUser={user} />
         </div>
 
         <div className="vc-composer">

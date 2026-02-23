@@ -81,8 +81,6 @@ export default function ProfilePage() {
       // await profileService.updateMe(values, avatarFile)
       await new Promise((r) => setTimeout(r, 700))
 
-      console.log('SAVE PROFILE', values, { avatarPreview })
-
       message.success('Perfil atualizado com sucesso!')
     } catch (err) {
       message.error('Não foi possível salvar seu perfil.')

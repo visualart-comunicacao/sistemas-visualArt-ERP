@@ -10,13 +10,10 @@ import {
   sendTicketMessage,
   openInboxStream,
   getApiErrorMessage,
+  assignTicket,
 } from '@/api/visualChat.api'
 
 function pickTicketsItems(res) {
-  // suporta:
-  // 1) { items: [...] }
-  // 2) { data: { items: [...] } }
-  // 3) { data: [...] } (caso mude)
   const items =
     res?.items ??
     res?.data?.items ??
@@ -27,10 +24,6 @@ function pickTicketsItems(res) {
 }
 
 function pickMessagesItems(res) {
-  // suporta:
-  // 1) { items: [...] }
-  // 2) { data: [...] }
-  // 3) { data: { items: [...] } }
   const items =
     res?.items ??
     (Array.isArray(res?.data) ? res.data : null) ??
@@ -43,17 +36,19 @@ function pickMessagesItems(res) {
 export default function VisualChatPage() {
   const [user, setUser] = useState(mockUser)
 
-  const [threads, setThreads] = useState([]) // tickets normalizados p/ UI
-  const [messagesByThread, setMessagesByThread] = useState({}) // ticketId -> messages[]
+  // ✅ filtro da sidebar controlado aqui (OPÇÃO 1)
+  const [queue, setQueue] = useState('Meus')
+
+  const [threads, setThreads] = useState([])
+  const [messagesByThread, setMessagesByThread] = useState({})
   const [activeThreadId, setActiveThreadId] = useState(null)
 
   const [loadingThreads, setLoadingThreads] = useState(false)
   const [loadingMessages, setLoadingMessages] = useState(false)
 
-  const contactsRef = useRef(new Map()) // contactId -> {id,name,phone,waId}
+  const contactsRef = useRef(new Map())
   const sseRef = useRef(null)
 
-  // Modal nova conversa (mock)
   const [newOpen, setNewOpen] = useState(false)
   const [newForm] = Form.useForm()
 
@@ -121,6 +116,7 @@ export default function VisualChatPage() {
       audioDuration: undefined,
       at: new Date(m.createdAt).toLocaleString('pt-BR'),
       status: m.status,
+      createdAt: m.createdAt, // ✅ ajuda o bubble a formatar hora
     }
   }
 
@@ -133,21 +129,10 @@ export default function VisualChatPage() {
     async function loadThreads() {
       try {
         setLoadingThreads(true)
-        console.log('[VisualChat] loadThreads -> calling listTickets', {
-          queue: 'espera',
-          take: 50,
-          skip: 0,
-        })
 
         const res = await listTickets({ queue: 'espera', take: 50, skip: 0 })
-        console.log('[VisualChat] listTickets raw result:', res)
-
         const items = pickTicketsItems(res)
-        console.log('[VisualChat] listTickets parsed items.length:', items.length)
-        if (items[0]) console.log('[VisualChat] listTickets first item sample:', items[0])
-
         const normalized = items.map(normalizeTicketToThread)
-        console.log('[VisualChat] normalized threads:', normalized)
 
         if (aborted) return
 
@@ -156,7 +141,6 @@ export default function VisualChatPage() {
         setActiveThreadId((prev) => {
           const next =
             prev && normalized.some((t) => t.id === prev) ? prev : normalized[0]?.id || null
-          console.log('[VisualChat] setActiveThreadId ->', next)
           return next
         })
       } catch (err) {
@@ -177,27 +161,17 @@ export default function VisualChatPage() {
   // 2) Carregar mensagens do ticket ativo
   // =========================
   useEffect(() => {
-    if (!activeThreadId) {
-      console.log('[VisualChat] loadMessages skipped: no activeThreadId')
-      return
-    }
+    if (!activeThreadId) return
 
     let aborted = false
 
     async function loadMessages() {
       try {
         setLoadingMessages(true)
-        console.log('[VisualChat] loadMessages -> calling listTicketMessages', activeThreadId)
 
         const res = await listTicketMessages(activeThreadId)
-        console.log('[VisualChat] listTicketMessages raw result:', res)
-
         const items = pickMessagesItems(res)
-        console.log('[VisualChat] listTicketMessages parsed items.length:', items.length)
-        if (items[0]) console.log('[VisualChat] listTicketMessages first item sample:', items[0])
-
         const normalized = items.map(normalizeMessage)
-        console.log('[VisualChat] normalized messages:', normalized)
 
         if (aborted) return
         setMessagesByThread((prev) => ({ ...prev, [activeThreadId]: normalized }))
@@ -220,19 +194,12 @@ export default function VisualChatPage() {
   // =========================
   useEffect(() => {
     try {
-      console.log('[VisualChat] SSE -> connecting...')
       const es = openInboxStream()
       sseRef.current = es
-
-      es.addEventListener('hello', (ev) => {
-        console.log('[VisualChat] SSE hello:', ev.data)
-      })
 
       es.addEventListener('message.created', (ev) => {
         try {
           const payload = JSON.parse(ev.data)
-          console.log('[VisualChat] SSE message.created payload:', payload)
-
           const ticket = payload.ticket
           const msg = payload.message
           if (!ticket?.id || !msg?.id) return
@@ -240,7 +207,6 @@ export default function VisualChatPage() {
           const threadId = ticket.id
           const normalizedMsg = normalizeMessage(msg)
 
-          // 1) Ticket na lista + preview + subir pro topo
           setThreads((prev) => {
             const exists = prev.some((t) => t.id === threadId)
 
@@ -250,10 +216,7 @@ export default function VisualChatPage() {
               lastMessageAt: ticket.lastMessageAt || msg.createdAt,
             })
 
-            if (!exists) {
-              console.log('[VisualChat] SSE -> new thread added:', threadId)
-              return [normalizedThread, ...prev]
-            }
+            if (!exists) return [normalizedThread, ...prev]
 
             const updated = prev.map((t) =>
               t.id === threadId
@@ -271,15 +234,11 @@ export default function VisualChatPage() {
             return [item, ...updated]
           })
 
-          // 2) Append da mensagem (sem duplicar)
           setMessagesByThread((prev) => {
             const arr = prev[threadId] || []
             if (arr.some((m) => m.id === normalizedMsg.id)) return prev
             return { ...prev, [threadId]: [...arr, normalizedMsg] }
           })
-
-          // 3) Se for o ticket ativo, não precisa recarregar nada.
-          // (a UI vai refletir pelo state acima)
         } catch (e) {
           console.error('[VisualChat] SSE parse error:', e)
         }
@@ -289,10 +248,7 @@ export default function VisualChatPage() {
         console.error('[VisualChat] SSE error:', e)
       }
 
-      return () => {
-        console.log('[VisualChat] SSE -> closing')
-        es.close()
-      }
+      return () => es.close()
     } catch (err) {
       console.error('[VisualChat] SSE init failed:', err)
     }
@@ -310,6 +266,31 @@ export default function VisualChatPage() {
   // =========================
   async function sendMessageReal(text) {
     if (!activeThreadId || !activeThread) return
+
+    // ✅ AUTO-ASSIGN ao responder se estiver em "Espera"
+    const shouldAutoAssign = activeThread.queue === 'Espera' || !activeThread.assignedTo
+
+    if (shouldAutoAssign) {
+      try {
+        const assignResp = await assignTicket(activeThreadId)
+        const assignedTicket = assignResp?.ticket || null
+
+        if (assignedTicket) {
+          const normalizedAssigned = normalizeTicketToThread(assignedTicket)
+
+          setThreads((prev) =>
+            prev.map((t) => (t.id === activeThreadId ? { ...t, ...normalizedAssigned } : t)),
+          )
+
+          // ✅ agora sim, só muda se veio atribuído
+          if (assignedTicket.assignedToId) setQueue('Meus')
+        }
+      } catch (err) {
+        console.error('[VisualChat] auto-assign failed:', err)
+        message.error(getApiErrorMessage(err))
+      }
+    }
+
     const trimmed = String(text || '').trim()
     if (!trimmed) return
 
@@ -323,6 +304,7 @@ export default function VisualChatPage() {
       type: 'text',
       text: trimmed,
       at: now.toLocaleString('pt-BR'),
+      createdAt: now.toISOString(),
       status: 'SENT',
       optimistic: true,
     }
@@ -341,10 +323,7 @@ export default function VisualChatPage() {
     )
 
     try {
-      console.log('[VisualChat] sendTicketMessage ->', activeThreadId, trimmed)
       const resp = await sendTicketMessage(activeThreadId, trimmed)
-      console.log('[VisualChat] sendTicketMessage result:', resp)
-
       const saved = resp?.message || resp?.data || null
 
       if (saved?.id) {
@@ -364,9 +343,6 @@ export default function VisualChatPage() {
           ),
         }))
       }
-
-      // Observação:
-      // Mesmo sem isso, o SSE deve chegar e refletir também.
     } catch (err) {
       console.error('[VisualChat] sendMessageReal error:', err)
       message.error(getApiErrorMessage(err))
@@ -428,6 +404,9 @@ export default function VisualChatPage() {
         onShare={shareThread}
         loadingThreads={loadingThreads}
         loadingMessages={loadingMessages}
+        onNewConversation={() => setNewOpen(true)}
+        queue={queue}
+        onChangeQueue={setQueue}
       />
 
       <FloatButton

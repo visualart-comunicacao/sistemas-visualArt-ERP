@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import MessageBubble from './MessageBubble'
 
-export default function MessagesList({ messages }) {
+export default function MessagesList({ messages, activeContact, currentUser }) {
   const ref = useRef(null)
 
   useEffect(() => {
@@ -10,8 +10,14 @@ export default function MessagesList({ messages }) {
 
   return (
     <div ref={ref} style={{ height: '100%', overflow: 'auto', paddingRight: 6 }}>
-      {messages.map((m) => (
-        <MessageBubble key={m.id} message={m} />
+      {(messages || []).map((m) => (
+        <MessageBubble
+          key={m.id}
+          message={m}
+          isMe={m.author === 'me'}
+          contact={activeContact}
+          user={currentUser}
+        />
       ))}
     </div>
   )

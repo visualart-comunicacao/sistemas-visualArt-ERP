@@ -102,8 +102,6 @@ export default function ProductEditPage({ mode = 'create' }) {
   async function onUploadedBindToProduct(uploadRes, altText = '') {
     if (!id) return
     try {
-      console.log('payload images:', { url: uploadRes.url, alt: altText || null })
-
       await addProductImage(id, { url: uploadRes.url, alt: altText || '' })
       message.success('Imagem enviada e vinculada ao produto!')
       await loadProduct()
@@ -589,7 +587,6 @@ export default function ProductEditPage({ mode = 'create' }) {
                                     const url = res?.url
 
                                     if (!url) {
-                                      console.log('Resposta do upload inválida:', res)
                                       message.error('Upload retornou resposta inválida (sem url).')
                                       return
                                     }
@@ -598,11 +595,6 @@ export default function ProductEditPage({ mode = 'create' }) {
                                       await onUploadedBindToProduct({ url }, alt)
                                       imgForm.resetFields(['alt'])
                                     } catch (e) {
-                                      console.log(
-                                        'Bind error:',
-                                        e?.response?.status,
-                                        e?.response?.data,
-                                      )
                                       message.error(
                                         e?.response?.data?.message ||
                                           'Erro ao vincular imagem ao produto.',
@@ -641,7 +633,6 @@ export default function ProductEditPage({ mode = 'create' }) {
                     <Row gutter={[12, 12]}>
                       {images.map((img) => {
                         const src = toAbsoluteUrl(img.url)
-                        console.log('Imagem src:', src)
                         return (
                           <Col key={img.id} xs={24} sm={12} lg={8}>
                             <Card

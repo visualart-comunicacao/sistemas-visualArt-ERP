@@ -180,7 +180,6 @@ export default function UsersPage() {
               icon={<EditOutlined />}
               onClick={(e) => {
                 e.stopPropagation() // 👈 impede expandir
-                console.log('edit', record.id)
               }}
             />
           </Tooltip>
@@ -192,7 +191,6 @@ export default function UsersPage() {
               icon={<DeleteOutlined />}
               onClick={(e) => {
                 e.stopPropagation() // 👈 impede expandir
-                console.log('edit', record.id)
               }}
             />
           </Tooltip>
