@@ -1,0 +1,95 @@
+.vc-shell {
+  display: grid;
+  grid-template-columns: 360px 1fr 320px;
+  gap: 12px;
+  height: calc(100vh - 64px - 32px); /* header do app + padding */
+}
+
+@media (max-width: 1200px) {
+  .vc-shell {
+    grid-template-columns: 360px 1fr;
+  }
+  .vc-right {
+    display: none;
+  }
+}
+
+.vc-panel {
+  background: #fff;
+  border: 1px solid #dce9e3;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.vc-left-header {
+  padding: 14px;
+  border-bottom: 1px solid #eef3f0;
+}
+
+.vc-left-search {
+  padding: 12px 14px;
+  border-bottom: 1px solid #eef3f0;
+}
+
+.vc-left-list {
+  padding: 12px;
+  overflow: auto;
+}
+
+.vc-chat-header {
+  padding: 12px 14px;
+  border-bottom: 1px solid #eef3f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.vc-messages {
+  padding: 14px;
+  overflow: auto;
+  flex: 1;
+  background: linear-gradient(180deg, rgba(242, 247, 244, 0.8), rgba(242, 247, 244, 0.4));
+}
+
+.vc-composer {
+  padding: 12px 14px;
+  border-top: 1px solid #eef3f0;
+  background: #fff;
+}
+
+.vc-bubble {
+  max-width: 70%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid #e6ece9;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(6, 108, 71, 0.06);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.vc-bubble.me {
+  margin-left: auto;
+  background: rgba(0, 168, 89, 0.1);
+  border-color: rgba(0, 168, 89, 0.2);
+}
+
+.vc-meta {
+  font-size: 12px;
+  opacity: 0.65;
+  margin-top: 6px;
+}
+
+/* Quando esconder painel direito, vira 2 colunas */
+.vc-shell.no-right {
+  grid-template-columns: 360px 1fr;
+}
+
+/* Painel direito escondido */
+.vc-shell.no-right .vc-right {
+  display: none !important;
+}

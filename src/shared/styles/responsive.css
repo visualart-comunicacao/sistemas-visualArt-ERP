@@ -1,0 +1,94 @@
+@media (max-width: 768px) {
+  .hide-sm {
+    display: none;
+  }
+}
+
+/* Sidebar premium */
+.ant-layout-sider .ant-menu-dark {
+  background: transparent !important;
+}
+
+.ant-layout-sider .ant-menu-dark .ant-menu-item,
+.ant-layout-sider .ant-menu-dark .ant-menu-submenu-title {
+  border-radius: 10px;
+  margin: 4px 0;
+}
+
+.ant-layout-sider .ant-menu-dark .ant-menu-item:hover,
+.ant-layout-sider .ant-menu-dark .ant-menu-submenu-title:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.ant-layout-sider .ant-menu-dark .ant-menu-item-selected {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+.ant-layout-sider .ant-menu-dark .ant-menu-submenu-selected > .ant-menu-submenu-title {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Ícones e texto */
+.ant-layout-sider .ant-menu-dark .ant-menu-item .anticon,
+.ant-layout-sider .ant-menu-dark .ant-menu-submenu-title .anticon {
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+.ant-layout-sider .ant-menu-dark .ant-menu-title-content {
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+/* ===== Sidebar Menu - Visual Art ===== */
+.va-sider-menu.ant-menu-dark {
+  background: transparent !important;
+}
+
+/* Itens e títulos do submenu */
+.va-sider-menu.ant-menu-dark .ant-menu-item,
+.va-sider-menu.ant-menu-dark .ant-menu-submenu-title {
+  border-radius: 12px;
+  margin: 6px 0;
+}
+
+/* Hover suave */
+.va-sider-menu.ant-menu-dark .ant-menu-item:hover,
+.va-sider-menu.ant-menu-dark .ant-menu-submenu-title:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Item selecionado */
+.va-sider-menu.ant-menu-dark .ant-menu-item-selected {
+  background: rgba(255, 255, 255, 0.16) !important;
+}
+
+/* ✅ O principal: fundo do SUBMENU (dropdown) */
+.va-sider-menu.ant-menu-dark .ant-menu-sub {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-radius: 14px !important;
+  margin: 8px 0 10px 0 !important;
+  padding: 8px !important;
+}
+
+/* Remove bordas internas estranhas */
+.va-sider-menu.ant-menu-dark.ant-menu-inline .ant-menu-sub {
+  box-shadow: none !important;
+}
+
+/* Ajuste de itens dentro do dropdown */
+.va-sider-menu.ant-menu-dark .ant-menu-sub .ant-menu-item {
+  margin: 4px 0 !important;
+  border-radius: 10px !important;
+}
+
+/* Submenu "selected" (quando está aberto) */
+.va-sider-menu.ant-menu-dark .ant-menu-submenu-selected > .ant-menu-submenu-title {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-radius: 12px !important;
+}
+
+/* Texto/ícones bem legíveis */
+.va-sider-menu.ant-menu-dark .ant-menu-item .anticon,
+.va-sider-menu.ant-menu-dark .ant-menu-submenu-title .anticon,
+.va-sider-menu.ant-menu-dark .ant-menu-title-content {
+  color: rgba(255, 255, 255, 0.92) !important;
+}
