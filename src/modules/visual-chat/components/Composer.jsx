@@ -43,58 +43,92 @@ function EmojiPicker({ onPick }) {
 export default function Composer({ onSend, onSendImageMock, disabled }) {
   const [text, setText] = useState('')
   const [internalNote, setInternalNote] = useState(false)
+  const [sending, setSending] = useState(false)
 
-  function submit() {
-    const v = text.trim()
-    if (!v) return
-    onSend(internalNote ? `[NOTA INTERNA] ${v}` : v)
-    setText('')
+  async function submit() {
+    const v = String(text || '').trim()
+    if (!v || disabled || sending) return
+
+    try {
+      setSending(true)
+      await Promise.resolve(onSend?.(internalNote ? `[NOTA INTERNA] ${v}` : v))
+      setText('')
+    } finally {
+      setSending(false)
+    }
   }
 
   const emojiContent = useMemo(() => <EmojiPicker onPick={(e) => setText((t) => t + e)} />, [])
 
   return (
-    <Space direction="vertical" style={{ width: '100%' }}>
-      <Space style={{ width: '100%', justifyContent: 'space-between' }} wrap>
-        <Space>
-          <Button
-            type="text"
-            icon={<PaperClipOutlined />}
-            onClick={() => onSendImageMock?.()}
-            disabled={disabled}
-          />
-          <Text type="secondary">Anexar (mock)</Text>
+    // ✅ impede reload por submit/Enter em qualquer cenário
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        submit()
+      }}
+      style={{ width: '100%' }}
+    >
+      <Space direction="vertical" style={{ width: '100%' }}>
+        <Space style={{ width: '100%', justifyContent: 'space-between' }} wrap>
+          <Space>
+            <Button
+              type="text"
+              icon={<PaperClipOutlined />}
+              onClick={() => onSendImageMock?.()}
+              disabled={disabled || sending}
+              htmlType="button" // ✅ nunca submit
+            />
+            <Text type="secondary">Anexar (mock)</Text>
+          </Space>
+
+          <Space>
+            <Switch checked={internalNote} onChange={setInternalNote} size="small" />
+            <Text type="secondary">Nota Interna</Text>
+          </Space>
         </Space>
 
-        <Space>
-          <Switch checked={internalNote} onChange={setInternalNote} size="small" />
-          <Text type="secondary">Nota Interna</Text>
-        </Space>
-      </Space>
+        <Space.Compact style={{ width: '100%' }}>
+          <Popover content={emojiContent} trigger="click">
+            <Button icon={<SmileOutlined />} disabled={disabled || sending} htmlType="button" />
+          </Popover>
 
-      <Space.Compact style={{ width: '100%' }}>
-        <Popover content={emojiContent} trigger="click">
-          <Button icon={<SmileOutlined />} disabled={disabled} />
-        </Popover>
-
-        <Input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Digite uma mensagem..."
-          onPressEnter={(e) => {
-            if (!e.shiftKey) {
-              e.preventDefault()
-              submit()
+          <Input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={
+              disabled ? 'Selecione uma conversa para enviar...' : 'Digite uma mensagem...'
             }
-          }}
-          disabled={disabled}
-        />
+            disabled={disabled || sending}
+            // ✅ mais confiável que onPressEnter
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                e.stopPropagation()
+                submit()
+              }
+            }}
+          />
 
-        <Button icon={<AudioOutlined />} disabled={disabled} />
-        <Button type="primary" icon={<SendOutlined />} onClick={submit} disabled={disabled}>
-          Enviar
-        </Button>
-      </Space.Compact>
-    </Space>
+          <Button icon={<AudioOutlined />} disabled={disabled || sending} htmlType="button" />
+
+          <Button
+            type="primary"
+            icon={<SendOutlined />}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              submit()
+            }}
+            disabled={disabled || sending}
+            loading={sending}
+            htmlType="button" // ✅ nunca submit
+          >
+            Enviar
+          </Button>
+        </Space.Compact>
+      </Space>
+    </form>
   )
 }

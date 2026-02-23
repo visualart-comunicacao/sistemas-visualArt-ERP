@@ -31,12 +31,18 @@ http.interceptors.response.use(
     const url = err?.config?.url || ''
     const isLoginCall = url.includes('/auth/login')
 
-    // ✅ importante: 401 no login NÃO dá hard reload
+    // ✅ 401 no login NÃO faz redirect
     if (status === 401 && isLoginCall) {
       return Promise.reject(err)
     }
 
-    // 401 nas demais rotas -> desloga e manda pro login
+    // ✅ não deslogar se for rota de SSE (stream)
+    // (algumas libs tentam chamar via axios em algum momento, ou seu app pode bater nele por engano)
+    if (status === 401 && url.includes('/inbox/stream')) {
+      return Promise.reject(err)
+    }
+
+    // ✅ 401 nas demais rotas -> desloga e manda pro login
     if (status === 401) {
       localStorage.removeItem('access_token')
       localStorage.removeItem('user')
