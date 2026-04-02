@@ -7,7 +7,7 @@ export const PRESENCE_OPTIONS = [
 
 export const mockUser = {
   id: 'u1',
-  name: 'Alex Borelli',
+  name: 'Teste',
   presence: 'AVAILABLE', // <- era "status" string
   avatarUrl: null,
 }

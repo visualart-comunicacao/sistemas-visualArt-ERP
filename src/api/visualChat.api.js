@@ -130,3 +130,23 @@ export async function updateContact(contactId, data) {
   const res = await http.patch(`/inbox/contacts/${contactId}`, data)
   return res.data // { contact }
 }
+
+export async function sendTicketAudio(ticketId, file, extra = {}) {
+  if (!ticketId) throw new Error('ticketId é obrigatório')
+  if (!file) throw new Error('arquivo de áudio é obrigatório')
+
+  const formData = new FormData()
+  formData.append('file', file, file.name || 'audio.webm')
+
+  if (extra.caption) formData.append('caption', extra.caption)
+  if (extra.durationSec != null) formData.append('durationSec', String(extra.durationSec))
+  if (extra.mimeType) formData.append('mimeType', extra.mimeType)
+
+  const response = await http.post(`/tickets/${ticketId}/messages/audio`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+
+  return response.data
+}

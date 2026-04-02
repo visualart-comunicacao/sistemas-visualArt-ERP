@@ -1,199 +1,319 @@
 import React, { useMemo, useState } from 'react'
-import { Avatar, Badge, Button, Input, Segmented, Space, Typography, Dropdown, Tag } from 'antd'
-import {
-  SearchOutlined,
-  FilterOutlined,
-  UserOutlined,
-  PlusOutlined,
-  DownOutlined,
-} from '@ant-design/icons'
+import { Avatar, Badge, Input, Select, Skeleton, Space, Typography } from 'antd'
+import { AppstoreOutlined, SearchOutlined, UserOutlined } from '@ant-design/icons'
 
 const { Text } = Typography
 
-function getInitials(name) {
-  const n = String(name || '').trim()
-  if (!n) return '?'
-  const parts = n.split(/\s+/).filter(Boolean)
-  const first = parts[0]?.[0] || ''
-  const last = parts.length > 1 ? parts[parts.length - 1]?.[0] : ''
-  return (first + last).toUpperCase() || first.toUpperCase() || '?'
+function stringToColor(str = '') {
+  let hash = 0
+  for (let i = 0; i < str.length; i += 1) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const color = `hsl(${hash % 360}, 65%, 45%)`
+  return color
+}
+
+function getFirstAndLastName(name) {
+  if (!name) return ''
+
+  const ignore = ['de', 'da', 'do', 'dos', 'das']
+
+  const parts = name
+    .trim()
+    .split(' ')
+    .filter((p) => !ignore.includes(p.toLowerCase()))
+
+  if (parts.length === 0) return ''
+  if (parts.length === 1) return parts[0]
+
+  return `${parts[0]} ${parts[parts.length - 1]}`
+}
+
+function getInitials(name = '') {
+  return String(name)
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join('')
+}
+
+function AgentChip({ agent, count, active, onClick }) {
+  const bg = active ? '#6c1bb8' : '#eee'
+
+  return (
+    <div className="vc-agent-chip-wrap" onClick={onClick}>
+      <Badge count={count} size="small" offset={[-2, 4]}>
+        <div
+          className={`vc-agent-chip ${active ? 'active' : ''}`}
+          style={{
+            background: active ? '#6c1bb8' : '#f1f1f1',
+            borderColor: active ? '#6c1bb8' : '#e5e5e5',
+          }}
+          title={agent?.name || 'Atendente'}
+        >
+          {agent?.avatarUrl ? (
+            <img src={agent.avatarUrl} alt={agent.name} className="vc-agent-chip-img" />
+          ) : agent?.avatar ? (
+            <img src={agent.avatar} alt={agent.name} className="vc-agent-chip-img" />
+          ) : (
+            <Avatar
+              size={34}
+              style={{
+                backgroundColor: active ? '#6c1bb8' : stringToColor(agent?.name || 'A'),
+                color: '#fff',
+              }}
+            >
+              {agent?.icon ? agent.icon : getInitials(agent?.name || 'A')}
+            </Avatar>
+          )}
+        </div>
+      </Badge>
+    </div>
+  )
+}
+
+function ThreadItem({ item, active, onClick }) {
+  return (
+    <div className={`vc-thread-item ${active ? 'active' : ''}`} onClick={onClick}>
+      <div className="vc-thread-avatar">
+        {item.avatarUrl ? (
+          <img src={item.avatarUrl} alt={item.title} />
+        ) : (
+          <Avatar
+            size={42}
+            style={{
+              backgroundColor: stringToColor(item.title || 'Contato'),
+              color: '#fff',
+            }}
+          >
+            {getInitials(item.title || 'C')}
+          </Avatar>
+        )}
+      </div>
+
+      <div className="vc-thread-main">
+        <div className="vc-thread-row">
+          <Text className="vc-thread-title" ellipsis>
+            {item.title}
+          </Text>
+          <Text className="vc-thread-time">{item.updatedAt || ''}</Text>
+        </div>
+
+        <div className="vc-thread-row">
+          <Text className="vc-thread-preview" ellipsis>
+            {item.lastMessage || 'Sem mensagens'}
+          </Text>
+
+          {!!item.unread && (
+            <div className="vc-thread-unread">
+              <span>{item.unread}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="vc-thread-meta">
+          <span className={`vc-queue-badge ${item.queue === 'Meus' ? 'meus' : 'espera'}`}>
+            {item.queue}
+          </span>
+          {item.assignedTo ? <span className="vc-thread-assigned">{item.assignedTo}</span> : null}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function LeftSidebar({
   user,
-  presenceOptions = [],
+  presenceOptions,
   onChangePresence,
+  agents = [],
   threads = [],
   activeThreadId,
   onSelectThread,
-  onNewConversation,
-
-  queue = 'Meus',
-  onChangeQueue,
+  loading,
 }) {
-  const [q, setQ] = useState('')
+  const [tab, setTab] = useState('Todos')
+  const [search, setSearch] = useState('')
+  const [selectedAgent, setSelectedAgent] = useState('all')
 
   const counts = useMemo(() => {
-    const c = { Meus: 0, Espera: 0, Todos: threads.length }
-    for (const t of threads) {
-      if (t.queue === 'Meus') c.Meus += 1
-      if (t.queue === 'Espera') c.Espera += 1
-    }
-    return c
+    const meus = threads.filter((t) => t.queue === 'Meus').length
+    const espera = threads.filter((t) => t.queue === 'Espera').length
+    const todos = threads.length
+    return { meus, espera, todos }
   }, [threads])
 
-  const filtered = useMemo(() => {
-    const qq = q.trim().toLowerCase()
-    return threads
-      .filter((t) => (queue === 'Todos' ? true : t.queue === queue))
-      .filter((t) => {
-        if (!qq) return true
-        const title = String(t.title || '').toLowerCase()
-        const last = String(t.lastMessage || '').toLowerCase()
-        return title.includes(qq) || last.includes(qq)
-      })
-  }, [threads, q, queue])
+  const countsByAgent = useMemo(() => {
+    const map = new Map()
 
-  const currentPresence = presenceOptions.find((p) => p.value === user?.presence)
+    agents.forEach((a) => {
+      map.set(a.id || a.name, 0)
+    })
 
-  const presenceMenu = {
-    items: presenceOptions.map((p) => ({
-      key: p.value,
-      label: (
-        <Space>
-          <Tag color={p.color}>{p.label}</Tag>
-        </Space>
-      ),
-      onClick: () => onChangePresence?.(p.value),
-    })),
-  }
+    threads.forEach((t) => {
+      if (!t.assignedTo) return
+      const found = agents.find(
+        (a) =>
+          a.name === t.assignedTo ||
+          a.id === t.assignedToId ||
+          a.id === t.assignedTo ||
+          a.username === t.assignedTo,
+      )
+      if (!found) return
+
+      const key = found.id || found.name
+      map.set(key, (map.get(key) || 0) + 1)
+    })
+
+    return map
+  }, [agents, threads])
+
+  const filteredThreads = useMemo(() => {
+    let arr = [...threads]
+
+    if (tab === 'Meus') arr = arr.filter((t) => t.queue === 'Meus')
+    if (tab === 'Espera') arr = arr.filter((t) => t.queue === 'Espera')
+
+    if (selectedAgent !== 'all') {
+      const agent = agents.find((a) => (a.id || a.name) === selectedAgent)
+      if (agent) {
+        arr = arr.filter((t) => t.assignedTo && t.assignedTo === agent.name)
+      }
+    }
+
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      arr = arr.filter(
+        (t) =>
+          String(t.title || '')
+            .toLowerCase()
+            .includes(q) ||
+          String(t.lastMessage || '')
+            .toLowerCase()
+            .includes(q) ||
+          String(t.assignedTo || '')
+            .toLowerCase()
+            .includes(q),
+      )
+    }
+
+    return arr
+  }, [threads, tab, selectedAgent, search, agents])
 
   return (
-    <>
-      {/* HEADER USUÁRIO */}
-      <div className="vc-left-header">
-        <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-          <Space>
-            <Avatar src={user?.avatarUrl} icon={<UserOutlined />}>
-              {getInitials(user?.name)}
-            </Avatar>
+    <div className="vc-left-sidebar">
+      <div className="vc-left-topbar">
+        <Space align="center">
+          <Avatar
+            size={34}
+            style={{ backgroundColor: stringToColor(user?.name || 'U') }}
+            icon={!user?.name ? <UserOutlined /> : null}
+          >
+            {user?.name ? getInitials(user.name) : null}
+          </Avatar>
 
-            <div style={{ lineHeight: 1.1 }}>
-              <Text strong>{user?.name}</Text>
-
-              <Dropdown menu={presenceMenu} trigger={['click']}>
-                <div
-                  style={{
-                    fontSize: 12,
-                    opacity: 0.85,
-                    cursor: 'pointer',
-                    marginTop: 2,
-                    userSelect: 'none',
-                  }}
-                >
-                  <Space size={4}>
-                    <span style={{ color: currentPresence?.color || '#52c41a' }}>●</span>
-                    {currentPresence?.label || 'Disponível'}
-                    <DownOutlined style={{ fontSize: 10 }} />
-                  </Space>
-                </div>
-              </Dropdown>
+          <div>
+            <div className="vc-user-name">{getFirstAndLastName(user?.name) || 'Usuário'}</div>
+            <div className="vc-user-status-row">
+              <Select
+                size="small"
+                value={user?.presence}
+                onChange={onChangePresence}
+                options={(presenceOptions || []).map((p) => ({
+                  value: p.value,
+                  label: p.label,
+                }))}
+                style={{ width: 120 }}
+              />
             </div>
-          </Space>
-
-          <Button
-            type="text"
-            icon={<PlusOutlined />}
-            onClick={onNewConversation}
-            title="Nova conversa"
-          />
+          </div>
         </Space>
       </div>
 
-      {/* BUSCA + FILTRO */}
-      <div className="vc-left-search">
-        <Space style={{ width: '100%' }}>
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            prefix={<SearchOutlined />}
-            placeholder="Buscar por nome ou última mensagem"
-            allowClear
-          />
-          <Button icon={<FilterOutlined />} title="Filtros (em breve)" />
-        </Space>
+      <div className="vc-tabs-row">
+        <button
+          type="button"
+          className={`vc-tab-btn ${tab === 'Meus' ? 'active' : ''}`}
+          onClick={() => setTab('Meus')}
+        >
+          <span>Meus</span>
+          <span className="vc-tab-count">{counts.meus}</span>
+        </button>
 
-        <div style={{ marginTop: 10 }}>
-          <Segmented
-            value={queue}
-            onChange={(v) => onChangeQueue?.(v)}
-            options={[
-              { label: `Meus (${counts.Meus})`, value: 'Meus' },
-              { label: `Espera (${counts.Espera})`, value: 'Espera' },
-              { label: `Todos (${counts.Todos})`, value: 'Todos' },
-            ]}
-          />
-        </div>
+        <button
+          type="button"
+          className={`vc-tab-btn ${tab === 'Espera' ? 'active' : ''}`}
+          onClick={() => setTab('Espera')}
+        >
+          <span>Espera</span>
+          <span className="vc-tab-count">{counts.espera}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`vc-tab-btn ${tab === 'Todos' ? 'active' : ''}`}
+          onClick={() => setTab('Todos')}
+        >
+          <span>Todos</span>
+          <span className="vc-tab-count">{counts.todos}</span>
+        </button>
       </div>
 
-      {/* LISTA */}
-      <div className="vc-left-list">
-        {filtered.map((t) => {
-          const active = t.id === activeThreadId
-          const initials = getInitials(t.title)
+      <div className="vc-agents-row">
+        <AgentChip
+          agent={{ name: 'Todos', icon: <AppstoreOutlined /> }}
+          count={threads.length}
+          active={selectedAgent === 'all'}
+          onClick={() => setSelectedAgent('all')}
+        />
 
+        {agents.map((agent) => {
+          const key = agent.id || agent.name
           return (
-            <div
-              key={t.id}
-              onClick={() => onSelectThread?.(t.id)}
-              style={{
-                padding: 12,
-                borderRadius: 14,
-                border: active ? '1px solid rgba(0,168,89,0.25)' : '1px solid #EEF3F0',
-                background: active ? 'rgba(0,168,89,0.08)' : '#fff',
-                cursor: 'pointer',
-                display: 'grid',
-                gap: 8,
-                marginBottom: 10,
-              }}
-            >
-              {/* linha 1: avatar + nome + hora */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Avatar size={36} style={{ flex: '0 0 auto' }}>
-                  {initials}
-                </Avatar>
-
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <Text strong ellipsis style={{ maxWidth: 220 }}>
-                      {t.title}
-                    </Text>
-
-                    <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
-                      {t.updatedAt}
-                    </Text>
-                  </div>
-
-                  {/* linha 2: preview + badge */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <Text type="secondary" ellipsis style={{ maxWidth: 230 }}>
-                      {t.lastMessage || '—'}
-                    </Text>
-
-                    {t.unread > 0 ? <Badge count={t.unread} size="small" /> : null}
-                  </div>
-                </div>
-              </div>
-
-              {/* linha 3: tags de estado */}
-              <div style={{ display: 'flex', gap: 6 }}>
-                {t.queue === 'Espera' ? <Tag color="orange">Espera</Tag> : null}
-                {t.waWindowUntil ? <Tag>24h</Tag> : null}
-              </div>
-            </div>
+            <AgentChip
+              key={key}
+              agent={agent}
+              count={countsByAgent.get(key) || 0}
+              active={selectedAgent === key}
+              onClick={() => setSelectedAgent(key)}
+            />
           )
         })}
       </div>
-    </>
+
+      <div className="vc-search-row">
+        <Input
+          prefix={<SearchOutlined />}
+          placeholder="Buscar conversa..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          allowClear
+        />
+      </div>
+
+      <div className="vc-thread-list">
+        {loading ? (
+          <div style={{ padding: 12 }}>
+            <Skeleton active avatar paragraph={{ rows: 1 }} />
+            <Skeleton active avatar paragraph={{ rows: 1 }} />
+            <Skeleton active avatar paragraph={{ rows: 1 }} />
+          </div>
+        ) : filteredThreads.length === 0 ? (
+          <div className="vc-empty-threads">
+            <Text type="secondary">Nenhuma conversa encontrada.</Text>
+          </div>
+        ) : (
+          filteredThreads.map((item) => (
+            <ThreadItem
+              key={item.id}
+              item={item}
+              active={item.id === activeThreadId}
+              onClick={() => onSelectThread(item.id)}
+            />
+          ))
+        )}
+      </div>
+    </div>
   )
 }

@@ -1,99 +1,134 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, Tooltip, message as antdMessage } from 'antd'
+import { Button, message } from 'antd'
 import { AudioOutlined, StopOutlined } from '@ant-design/icons'
-import { http } from '@/api/http' // seu axios
 
-function pickSupportedMime() {
-  const mimes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg']
-  for (const m of mimes) {
-    if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m
-  }
-  return ''
-}
+export default function VoiceRecorderButton({
+  ticketId,
+  disabled,
+  onRecordingChange,
+  onRecordingTimeChange,
+}) {
+  const [isRecording, setIsRecording] = useState(false)
 
-export default function VoiceRecorderButton({ ticketId, onSent, disabled }) {
-  const [recording, setRecording] = useState(false)
-  const recRef = useRef(null)
-  const chunksRef = useRef([])
-  const startedAtRef = useRef(0)
+  const mediaRecorderRef = useRef(null)
   const streamRef = useRef(null)
+  const chunksRef = useRef([])
+  const timerRef = useRef(null)
+  const secondsRef = useRef(0)
+
+  useEffect(() => {
+    onRecordingChange?.(isRecording)
+  }, [isRecording, onRecordingChange])
+
+  function stopTimer() {
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+  }
+
+  function stopStreamTracks() {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+  }
 
   useEffect(() => {
     return () => {
-      try {
-        streamRef.current?.getTracks()?.forEach((t) => t.stop())
-      } catch (err) {
-        console.error('Erro ao parar stream:', err)
-      }
+      stopTimer()
+      stopStreamTracks()
     }
   }, [])
 
-  async function start() {
+  function startTimer() {
+    stopTimer()
+    secondsRef.current = 0
+    onRecordingTimeChange?.(0)
+
+    timerRef.current = setInterval(() => {
+      secondsRef.current += 1
+      onRecordingTimeChange?.(secondsRef.current)
+    }, 1000)
+  }
+
+  async function startRecording() {
+    if (disabled || !ticketId) return
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
 
-      const mimeType = pickSupportedMime()
-      const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
-
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
       chunksRef.current = []
-      startedAtRef.current = Date.now()
 
-      rec.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) chunksRef.current.push(e.data)
-      }
-
-      rec.onstop = async () => {
-        const durationMs = Math.max(0, Date.now() - startedAtRef.current)
-        const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
-
-        // upload
-        const fd = new FormData()
-        fd.append('file', blob, `voice.${rec.mimeType?.includes('ogg') ? 'ogg' : 'webm'}`)
-        fd.append('durationMs', String(durationMs))
-
-        try {
-          const { data } = await http.post(`/inbox/tickets/${ticketId}/voice`, fd, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-          })
-          onSent?.(data)
-        } catch (err) {
-          antdMessage.error('Falha ao enviar áudio.')
-        } finally {
-          try {
-            streamRef.current?.getTracks()?.forEach((t) => t.stop())
-          } catch (err) {
-            console.error('Erro ao parar stream:', err)
-          }
-          streamRef.current = null
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          chunksRef.current.push(event.data)
         }
       }
 
-      recRef.current = rec
-      rec.start()
-      setRecording(true)
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+        console.log('[VisualChat] áudio gravado:', blob)
+
+        stopTimer()
+        stopStreamTracks()
+        setIsRecording(false)
+        onRecordingTimeChange?.(0)
+
+        message.success('Áudio gravado com sucesso (mock).')
+      }
+
+      mediaRecorder.start()
+      setIsRecording(true)
+      startTimer()
     } catch (err) {
-      antdMessage.error('Sem permissão do microfone ou dispositivo indisponível.')
+      console.error('[VisualChat] erro ao iniciar gravação:', err)
+      message.error('Não foi possível acessar o microfone.')
+      stopTimer()
+      stopStreamTracks()
+      setIsRecording(false)
+      onRecordingTimeChange?.(0)
     }
   }
 
-  function stop() {
+  function stopRecording() {
     try {
-      recRef.current?.stop()
-    } finally {
-      setRecording(false)
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop()
+      } else {
+        stopTimer()
+        stopStreamTracks()
+        setIsRecording(false)
+        onRecordingTimeChange?.(0)
+      }
+    } catch (err) {
+      console.error('[VisualChat] erro ao parar gravação:', err)
+      stopTimer()
+      stopStreamTracks()
+      setIsRecording(false)
+      onRecordingTimeChange?.(0)
+      message.error('Erro ao finalizar gravação.')
     }
   }
 
-  return (
-    <Tooltip title={recording ? 'Parar e enviar' : 'Gravar áudio'}>
-      <Button
-        type={recording ? 'primary' : 'default'}
-        danger={recording}
-        icon={recording ? <StopOutlined /> : <AudioOutlined />}
-        onClick={recording ? stop : start}
-        disabled={disabled}
-      />
-    </Tooltip>
+  return isRecording ? (
+    <Button
+      danger
+      icon={<StopOutlined />}
+      onClick={stopRecording}
+      htmlType="button"
+      style={{ height: 'auto' }}
+    />
+  ) : (
+    <Button
+      icon={<AudioOutlined />}
+      onClick={startRecording}
+      // disabled={disabled || !ticketId}
+      htmlType="button"
+      style={{ height: 'auto' }}
+    />
   )
 }

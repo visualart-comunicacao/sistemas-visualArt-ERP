@@ -2,13 +2,15 @@
   display: grid;
   grid-template-columns: 360px 1fr 320px;
   gap: 12px;
-  height: calc(100vh - 64px - 32px); /* header do app + padding */
+  height: calc(100vh - 64px - 32px);
+  /* header do app + padding */
 }
 
 @media (max-width: 1200px) {
   .vc-shell {
     grid-template-columns: 360px 1fr;
   }
+
   .vc-right {
     display: none;
   }
@@ -92,4 +94,256 @@
 /* Painel direito escondido */
 .vc-shell.no-right .vc-right {
   display: none !important;
+}
+
+.vc-left-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #fff;
+}
+
+.vc-left-topbar {
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid #efefef;
+}
+
+.vc-user-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #222;
+}
+
+.vc-user-status-row {
+  margin-top: 4px;
+}
+
+.vc-tabs-row {
+  display: flex;
+  gap: 10px;
+  padding: 14px 12px 10px;
+  border-bottom: 1px solid #f1f1f1;
+}
+
+.vc-tab-btn {
+  border: none;
+  background: transparent;
+  border-radius: 20px;
+  padding: 8px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #444;
+  font-weight: 500;
+}
+
+.vc-tab-btn.active {
+  background: #6c1bb8;
+  color: #fff;
+}
+
+.vc-tab-count {
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #ff8f8f;
+  color: #fff;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  font-weight: 700;
+}
+
+.vc-tab-btn.active .vc-tab-count {
+  background: #ff8f8f;
+  color: #fff;
+}
+
+.vc-agents-row {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  overflow-x: auto;
+  border-bottom: 1px solid #f1f1f1;
+}
+
+.vc-agent-chip-wrap {
+  cursor: pointer;
+}
+
+.vc-agent-chip {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 2px solid #e8e8e8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.vc-agent-chip-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vc-search-row {
+  padding: 12px;
+  border-bottom: 1px solid #f1f1f1;
+}
+
+.vc-thread-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.vc-thread-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f7f7f7;
+  transition: background 0.2s ease;
+}
+
+.vc-thread-item:hover {
+  background: #faf7ff;
+}
+
+.vc-thread-item.active {
+  background: #f5ecff;
+}
+
+.vc-thread-avatar img {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.vc-thread-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.vc-thread-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.vc-thread-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #222;
+  max-width: 190px;
+}
+
+.vc-thread-time {
+  font-size: 12px;
+  color: #999;
+  white-space: nowrap;
+}
+
+.vc-thread-preview {
+  font-size: 13px;
+  color: #666;
+  max-width: 200px;
+}
+
+.vc-thread-unread {
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #ff6b6b;
+  color: #fff;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  font-weight: 700;
+}
+
+.vc-thread-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.vc-queue-badge {
+  font-size: 11px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-weight: 600;
+}
+
+.vc-queue-badge.meus {
+  background: #e8f7ee;
+  color: #188f4f;
+}
+
+.vc-queue-badge.espera {
+  background: #fff1f1;
+  color: #d14a4a;
+}
+
+.vc-thread-assigned {
+  font-size: 11px;
+  color: #777;
+  font-weight: 500;
+}
+
+.vc-empty-threads {
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.vc-chat-header-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #fff;
+  border-bottom: 1px solid #efefef;
+}
+
+.vc-chat-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.vc-chat-header-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.vc-chat-header-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #222;
+}
+
+.vc-chat-header-subline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.vc-chat-header-right {
+  display: flex;
+  align-items: center;
 }

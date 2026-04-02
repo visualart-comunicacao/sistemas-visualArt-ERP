@@ -1,109 +1,202 @@
-import React, { useMemo, useState } from 'react'
-import { Avatar, Button, Dropdown, Modal, Select, Space, Tag, Typography, Tooltip } from 'antd'
+import React from 'react'
+import { Avatar, Button, Dropdown, Space, Tag, Tooltip } from 'antd'
 import {
   UserOutlined,
-  ShareAltOutlined,
+  HistoryOutlined,
+  CheckCircleOutlined,
   MoreOutlined,
-  SwapOutlined,
-  DownOutlined,
+  MenuFoldOutlined,
+  ShareAltOutlined,
+  MenuUnfoldOutlined,
 } from '@ant-design/icons'
 
-const { Text } = Typography
+function stringToColor(str = '') {
+  let hash = 0
+  for (let i = 0; i < str.length; i += 1) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return `hsl(${hash % 360}, 65%, 45%)`
+}
+
+function getInitials(name = '') {
+  return String(name)
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join('')
+}
 
 export default function ChatHeader({
+  user,
   contact,
   thread,
-  agents = [],
-  onChangeTicket,
-  onTransfer,
-  onShare,
   onToggleRight,
+  onAssumeThread,
+  onCloseThread,
+  onOpenHistory,
+  showRight,
+  onShare,
 }) {
-  const [transferOpen, setTransferOpen] = useState(false)
-  const [transferTo, setTransferTo] = useState(null)
+  const responsible = thread?.assignedTo || null
+  const isMine = responsible && responsible === user?.name
+  const isWaiting = !thread?.assignedTo
 
-  const ticketMenu = useMemo(() => {
-    const list = thread?.ticketList || []
-    return {
-      items: list.map((t) => ({
-        key: t,
-        label: t,
-        onClick: () => onChangeTicket?.(t),
-      })),
-    }
-  }, [thread, onChangeTicket])
-
-  const shareMenu = {
-    items: [
-      { key: 'copy', label: 'Copiar link (mock)', onClick: () => onShare?.('copy') },
-      { key: 'export', label: 'Exportar conversa (mock)', onClick: () => onShare?.('export') },
-    ],
-  }
+  const menuItems = [
+    {
+      key: 'history',
+      label: 'Histórico',
+      icon: <HistoryOutlined />,
+      onClick: onOpenHistory,
+    },
+    {
+      key: 'share',
+      label: 'Compartilhar',
+      icon: <ShareAltOutlined />,
+      onClick: () => onShare?.('copy'),
+    },
+  ]
 
   return (
-    <Space style={{ width: '100%', justifyContent: 'space-between' }} wrap>
-      <Space style={{ minWidth: 0 }}>
-        <Avatar icon={<UserOutlined />} />
-        <div style={{ lineHeight: 1.1, minWidth: 0 }}>
-          <Text strong style={{ display: 'block' }}>
-            {contact?.name || 'Selecione uma conversa'}
-          </Text>
+    <>
+      {/* HEADER */}
+      <div style={styles.header}>
+        {/* ESQUERDA */}
+        <div style={styles.left}>
+          <Avatar
+            size={42}
+            style={{
+              backgroundColor: stringToColor(contact?.name || contact?.waId || 'Contato'),
+              color: '#fff',
+            }}
+          >
+            {getInitials(contact?.name || contact?.waId || 'C')}
+          </Avatar>
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-            {(contact?.tags || []).map((t) => (
-              <Tag key={t} color="green">
-                {t}
-              </Tag>
-            ))}
+          <div style={styles.meta}>
+            <div style={styles.name}>{contact?.name || contact?.waId || 'Sem nome'}</div>
+
+            <div style={styles.tags}>
+              {responsible ? (
+                <Tag color="purple">Responsável: {responsible}</Tag>
+              ) : (
+                <Tag color="red">Sem responsável</Tag>
+              )}
+
+              {thread?.status && <Tag>{thread.status}</Tag>}
+            </div>
           </div>
         </div>
-      </Space>
 
-      <Space wrap>
-        {/* Ticket Atual */}
-        <Dropdown menu={ticketMenu} trigger={['click']} disabled={!thread}>
-          <Button>
-            Ticket Atual: <b>{thread?.ticketCurrent || '#—'}</b> <DownOutlined />
-          </Button>
-        </Dropdown>
+        {/* DIREITA */}
+        <div style={styles.right}>
+          <Space>
+            {isWaiting && (
+              <Tooltip title="Assumir conversa">
+                <Button type="primary" icon={<UserOutlined />} onClick={onAssumeThread}>
+                  Assumir
+                </Button>
+              </Tooltip>
+            )}
 
-        {/* Transferir */}
-        <Button icon={<SwapOutlined />} onClick={() => setTransferOpen(true)} disabled={!thread}>
-          Transferir
-        </Button>
+            {isMine && (
+              <Tooltip title="Encerrar ticket">
+                <Button danger icon={<CheckCircleOutlined />} onClick={onCloseThread}>
+                  Encerrar
+                </Button>
+              </Tooltip>
+            )}
 
-        {/* Compartilhar */}
-        <Dropdown menu={shareMenu} trigger={['click']} disabled={!thread}>
-          <Button icon={<ShareAltOutlined />} />
-        </Dropdown>
+            <Tooltip title="Histórico">
+              <Button icon={<HistoryOutlined />} onClick={onOpenHistory} />
+            </Tooltip>
 
-        {/* 3 pontinhos: painel direito */}
-        <Tooltip title="Recolher/mostrar painel">
-          <Button icon={<MoreOutlined />} onClick={onToggleRight} />
-        </Tooltip>
-      </Space>
+            <Dropdown
+              menu={{
+                items: menuItems.map((item) => ({
+                  key: item.key,
+                  icon: item.icon,
+                  label: item.label,
+                  onClick: item.onClick,
+                })),
+              }}
+              trigger={['click']}
+            >
+              <Button icon={<MoreOutlined />} />
+            </Dropdown>
 
-      <Modal
-        open={transferOpen}
-        title="Transferir conversa"
-        okText="Transferir"
-        cancelText="Cancelar"
-        onCancel={() => setTransferOpen(false)}
-        onOk={() => {
-          if (!transferTo) return
-          onTransfer?.(transferTo)
-          setTransferOpen(false)
-          setTransferTo(null)
-        }}
-      >
-        <Select
-          style={{ width: '100%' }}
-          placeholder="Selecione o atendente"
-          options={agents.map((a) => ({ label: a, value: a }))}
-          value={transferTo}
-          onChange={setTransferTo}
-        />
-      </Modal>
-    </Space>
+            <Tooltip title="Painel direito">
+              {!showRight ? (
+                <Button icon={<MenuFoldOutlined />} onClick={onToggleRight} />
+              ) : (
+                <Button icon={<MenuUnfoldOutlined />} onClick={onToggleRight} />
+              )}
+            </Tooltip>
+          </Space>
+        </div>
+      </div>
+
+      {/* LINHA */}
+      <div style={styles.divider} />
+    </>
   )
+}
+
+/* =========================
+   STYLES
+========================= */
+
+const styles = {
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    padding: '12px 16px',
+    background: '#fff',
+  },
+
+  left: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+    minWidth: 0,
+  },
+
+  meta: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: 1,
+    minWidth: 0,
+  },
+
+  name: {
+    fontSize: 16,
+    fontWeight: 700,
+    color: '#222',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+
+  tags: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+    flexWrap: 'wrap',
+  },
+
+  right: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginLeft: 'auto', // 🔥 força ficar colado na direita
+    flexShrink: 0,
+  },
+
+  divider: {
+    borderBottom: '1px solid #eee',
+  },
 }

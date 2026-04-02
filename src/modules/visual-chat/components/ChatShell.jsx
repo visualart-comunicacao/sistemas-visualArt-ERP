@@ -29,12 +29,12 @@ export default function ChatShell({
   onTransfer,
   onShare,
 
-  // ✅ vindo do VisualChatPage (opção 1)
-  queue,
-  onChangeQueue,
+  onAssumeThread,
+  onCloseThread,
+  onOpenHistory,
 
-  onNewConversation,
-  onContactUpdated,
+  loadingThreads,
+  loadingMessages,
 }) {
   const [showRight, setShowRight] = useState(true)
 
@@ -45,30 +45,34 @@ export default function ChatShell({
           user={user}
           presenceOptions={presenceOptions}
           onChangePresence={onChangePresence}
+          agents={agents}
           threads={threads}
           activeThreadId={activeThreadId}
           onSelectThread={onSelectThread}
-          onNewConversation={onNewConversation}
-          queue={queue}
-          onChangeQueue={onChangeQueue}
+          loading={loadingThreads}
         />
       </div>
 
       <div className="vc-panel vc-center">
         <div className="vc-chat-header">
           <ChatHeader
+            user={user}
             contact={contact}
             thread={thread}
             agents={agents}
             onChangeTicket={onChangeTicket}
             onTransfer={onTransfer}
             onShare={onShare}
+            showRight={showRight}
             onToggleRight={() => setShowRight((v) => !v)}
+            onAssumeThread={onAssumeThread}
+            onCloseThread={onCloseThread}
+            onOpenHistory={onOpenHistory}
           />
         </div>
 
         <div className="vc-messages">
-          <MessagesList messages={messages} activeContact={contact} currentUser={user} />
+          <MessagesList messages={messages} loading={loadingMessages} />
         </div>
 
         <div className="vc-composer">
@@ -81,7 +85,7 @@ export default function ChatShell({
       </div>
 
       <div className="vc-panel vc-right">
-        <ContactInfoPanel contact={contact} onContactUpdated={onContactUpdated} />
+        <ContactInfoPanel contact={contact} />
       </div>
     </div>
   )

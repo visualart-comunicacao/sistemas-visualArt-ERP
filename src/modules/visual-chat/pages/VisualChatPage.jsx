@@ -1,17 +1,21 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { FloatButton, Form, Input, message, Modal } from 'antd'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { FloatButton, Form, Input, message, Modal, Space, Tag, Typography } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import ChatShell from '../components/ChatShell'
 import { mockUser, PRESENCE_OPTIONS, mockAgents } from '../mock/data'
+import { useAuth } from '@/store/auth/AuthContext'
 
 import {
   listTickets,
   listTicketMessages,
   sendTicketMessage,
+  assignTicket,
+  closeTicket,
   openInboxStream,
   getApiErrorMessage,
-  assignTicket,
 } from '@/api/visualChat.api'
+
+const { Text } = Typography
 
 function pickTicketsItems(res) {
   const items =
@@ -34,7 +38,7 @@ function pickMessagesItems(res) {
 }
 
 export default function VisualChatPage() {
-  const [user, setUser] = useState(mockUser)
+  const { user } = useAuth()
 
   // ✅ filtro da sidebar controlado aqui (OPÇÃO 1)
   const [queue, setQueue] = useState('Meus')
@@ -52,10 +56,67 @@ export default function VisualChatPage() {
   const [newOpen, setNewOpen] = useState(false)
   const [newForm] = Form.useForm()
 
+  const [historyOpen, setHistoryOpen] = useState(false)
+
   const activeThread = useMemo(
     () => threads.find((t) => t.id === activeThreadId) || null,
     [threads, activeThreadId],
   )
+
+  async function handleAssumeThread() {
+    if (!activeThreadId) return
+
+    try {
+      await assignTicket(activeThreadId, {})
+
+      setThreads((prev) =>
+        prev.map((t) =>
+          t.id === activeThreadId
+            ? {
+                ...t,
+                assignedTo: user?.name || 'Eu',
+                assignedToId: user?.id || 'me',
+                queue: 'Meus',
+              }
+            : t,
+        ),
+      )
+
+      message.success('Conversa assumida com sucesso')
+    } catch (err) {
+      console.error('[VisualChat] handleAssumeThread error:', err)
+      message.error(getApiErrorMessage(err))
+    }
+  }
+
+  async function handleCloseThread() {
+    if (!activeThreadId) return
+
+    try {
+      await closeTicket(activeThreadId)
+
+      setThreads((prev) => prev.filter((t) => t.id !== activeThreadId))
+      setMessagesByThread((prev) => {
+        const copy = { ...prev }
+        delete copy[activeThreadId]
+        return copy
+      })
+
+      setActiveThreadId((prev) => {
+        const remaining = threads.filter((t) => t.id !== prev)
+        return remaining[0]?.id || null
+      })
+
+      message.success('Ticket encerrado com sucesso')
+    } catch (err) {
+      console.error('[VisualChat] handleCloseThread error:', err)
+      message.error(getApiErrorMessage(err))
+    }
+  }
+
+  function handleOpenHistory() {
+    setHistoryOpen(true)
+  }
 
   const activeContact = useMemo(() => {
     if (!activeThread) return null
@@ -82,6 +143,7 @@ export default function VisualChatPage() {
     return {
       id: t.id,
       contactId: t.contactId,
+      assignedToId: t.assignedToId || null,
       toWaId: t.contact?.waId || null,
 
       title: t.contact?.name || t.contact?.waId || 'Sem nome',
@@ -93,6 +155,8 @@ export default function VisualChatPage() {
 
       queue: t.assignedToId ? 'Meus' : 'Espera',
       assignedTo: t.assignedTo?.name || null,
+
+      status: t.status || 'OPEN',
       waWindowUntil: t.waWindowUntil || null,
     }
   }
@@ -130,7 +194,8 @@ export default function VisualChatPage() {
       try {
         setLoadingThreads(true)
 
-        const res = await listTickets({ queue: 'espera', take: 50, skip: 0 })
+        // ✅ importante: trazer TODOS
+        const res = await listTickets({ queue: 'todos', take: 100, skip: 0 })
         const items = pickTicketsItems(res)
         const normalized = items.map(normalizeTicketToThread)
 
@@ -152,6 +217,7 @@ export default function VisualChatPage() {
     }
 
     loadThreads()
+
     return () => {
       aborted = true
     }
@@ -258,7 +324,8 @@ export default function VisualChatPage() {
   // Presença (mock)
   // =========================
   function onChangePresence(nextPresence) {
-    setUser((prev) => ({ ...prev, presence: nextPresence }))
+    console.log('mudei')
+    // setUser((prev) => ({ ...prev, presence: nextPresence }))
   }
 
   // =========================
@@ -403,6 +470,9 @@ export default function VisualChatPage() {
         onChangeTicket={changeTicket}
         onTransfer={transferThread}
         onShare={shareThread}
+        onAssumeThread={handleAssumeThread}
+        onCloseThread={handleCloseThread}
+        onOpenHistory={handleOpenHistory}
         loadingThreads={loadingThreads}
         loadingMessages={loadingMessages}
         onNewConversation={() => setNewOpen(true)}
@@ -456,6 +526,58 @@ export default function VisualChatPage() {
             <Input placeholder="+55 (16) 9...." />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        open={historyOpen}
+        onCancel={() => setHistoryOpen(false)}
+        footer={null}
+        title="Histórico da conversa"
+        width={720}
+      >
+        <div style={{ marginBottom: 12 }}>
+          <Space wrap>
+            <Tag color="blue">
+              Contato: {activeContact?.name || activeContact?.waId || 'Sem nome'}
+            </Tag>
+            <Tag color="purple">Responsável: {activeThread?.assignedTo || 'Sem responsável'}</Tag>
+            <Tag>{activeThread?.status || 'OPEN'}</Tag>
+            <Tag color={activeThread?.queue === 'Meus' ? 'green' : 'red'}>
+              {activeThread?.queue || 'Espera'}
+            </Tag>
+          </Space>
+        </div>
+
+        <div
+          style={{
+            maxHeight: 420,
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+            paddingRight: 6,
+          }}
+        >
+          {activeMessages.length === 0 ? (
+            <Text type="secondary">Nenhuma mensagem.</Text>
+          ) : (
+            activeMessages.map((m) => (
+              <div
+                key={m.id}
+                style={{
+                  alignSelf: m.author === 'me' ? 'flex-end' : 'flex-start',
+                  background: m.author === 'me' ? '#f1e6ff' : '#f5f5f5',
+                  padding: '10px 12px',
+                  borderRadius: 12,
+                  maxWidth: '80%',
+                }}
+              >
+                <div style={{ fontSize: 13 }}>{m.text || '[mídia]'}</div>
+                <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>{m.at}</div>
+              </div>
+            ))
+          )}
+        </div>
       </Modal>
     </>
   )

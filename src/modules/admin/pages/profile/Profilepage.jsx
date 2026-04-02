@@ -186,7 +186,7 @@ export default function ProfilePage() {
                       { min: 2, message: 'Mínimo 2 caracteres.' },
                     ]}
                   >
-                    <Input prefix={<UserOutlined />} placeholder="Ex.: Alex Borelli" />
+                    <Input prefix={<UserOutlined />} placeholder="" />
                   </Form.Item>
                 </Col>
 

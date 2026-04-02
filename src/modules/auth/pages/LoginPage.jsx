@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Button, Form, Input, Space, Typography, message } from 'antd'
 import { LockOutlined, MailOutlined, ArrowRightOutlined } from '@ant-design/icons'
 import { motion } from 'framer-motion'
