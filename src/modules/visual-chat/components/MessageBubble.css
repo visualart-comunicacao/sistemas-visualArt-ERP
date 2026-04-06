@@ -174,3 +174,8 @@
   width: 100%;
   max-width: 360px;
 }
+
+.va-msg-author {
+  font-weight: 500;
+  margin-right: 4px;
+}

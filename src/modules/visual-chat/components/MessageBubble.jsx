@@ -195,7 +195,12 @@ export default function MessageBubble({ message, isMe, contact, user }) {
         ) : null}
 
         <div className="va-msg-meta">
+          {isMe && message?.senderName && (
+            <span className="va-msg-author">{message.senderName} • </span>
+          )}
+
           <span className="va-msg-time">{time}</span>
+
           {isMe ? <StatusMark status={message?.status} errorText={errorText} /> : null}
         </div>
       </div>
