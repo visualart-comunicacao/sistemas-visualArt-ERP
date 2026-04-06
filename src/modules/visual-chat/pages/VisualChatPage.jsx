@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { FloatButton, Form, Input, message, Modal, Space, Tag, Typography } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import ChatShell from '../components/ChatShell'
-import { mockUser, PRESENCE_OPTIONS, mockAgents } from '../mock/data'
+import { PRESENCE_OPTIONS } from '../mock/data'
 import { useAuth } from '@/store/auth/AuthContext'
 
 import {
@@ -13,6 +13,7 @@ import {
   closeTicket,
   openInboxStream,
   getApiErrorMessage,
+  listInboxAgents,
 } from '@/api/visualChat.api'
 
 const { Text } = Typography
@@ -37,11 +38,27 @@ function pickMessagesItems(res) {
   return Array.isArray(items) ? items : []
 }
 
+function getThreadQueue(ticket, currentUserId) {
+  if (!ticket?.assignedToId) return 'Espera'
+  if (ticket.assignedToId === currentUserId) return 'Meus'
+  return 'Todos'
+}
+
+function formatTime(dateLike) {
+  if (!dateLike) return ''
+  return new Date(dateLike).toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 export default function VisualChatPage() {
   const { user } = useAuth()
 
-  // ✅ filtro da sidebar controlado aqui (OPÇÃO 1)
   const [queue, setQueue] = useState('Meus')
+
+  const [agents, setAgents] = useState([])
+  const [loadingAgents, setLoadingAgents] = useState(false)
 
   const [threads, setThreads] = useState([])
   const [messagesByThread, setMessagesByThread] = useState({})
@@ -63,24 +80,106 @@ export default function VisualChatPage() {
     [threads, activeThreadId],
   )
 
+  const activeContact = useMemo(() => {
+    if (!activeThread) return null
+    return contactsRef.current.get(activeThread.contactId) || null
+  }, [activeThread])
+
+  const activeMessages = useMemo(() => {
+    if (!activeThreadId) return []
+    return messagesByThread[activeThreadId] || []
+  }, [messagesByThread, activeThreadId])
+
+  function normalizeTicketToThread(t) {
+    if (t?.contact?.id) {
+      contactsRef.current.set(t.contact.id, {
+        id: t.contact.id,
+        name: t.contact.name || null,
+        phone: t.contact.phoneE164 || null,
+        waId: t.contact.waId || null,
+      })
+    }
+
+    const last = t?.messages?.[0] || null
+
+    return {
+      id: t.id,
+      contactId: t.contactId,
+      assignedToId: t.assignedToId || null,
+      toWaId: t.contact?.waId || null,
+
+      title: t.contact?.name || t.contact?.waId || 'Sem nome',
+      lastMessage: last?.text || '',
+      updatedAt: formatTime(t.lastMessageAt),
+      unread: t.unreadCount || 0,
+
+      queue: getThreadQueue(t, user?.id),
+      assignedTo: t.assignedTo?.name || null,
+
+      status: t.status || 'OPEN',
+      waWindowUntil: t.waWindowUntil || null,
+    }
+  }
+
+  function normalizeMessage(m) {
+    return {
+      id: m.id,
+      threadId: m.ticketId,
+      author: m.direction === 'OUT' ? 'me' : 'them',
+      type:
+        m.type === 'IMAGE'
+          ? 'image'
+          : m.type === 'AUDIO'
+            ? 'audio'
+            : m.type === 'DOCUMENT'
+              ? 'document'
+              : 'text',
+      text: m.text || undefined,
+      url: m.mediaUrl || undefined,
+      caption: null,
+      audioDuration: undefined,
+      at: new Date(m.createdAt).toLocaleString('pt-BR'),
+      status: m.status,
+      createdAt: m.createdAt,
+      senderName: m.senderName || null,
+      senderUserId: m.senderUserId || null,
+      senderType: m.senderType || null,
+    }
+  }
+
   async function handleAssumeThread() {
     if (!activeThreadId) return
 
     try {
-      await assignTicket(activeThreadId, {})
+      const resp = await assignTicket(activeThreadId, {})
+      const updatedTicket = resp?.ticket || resp?.data || resp || null
 
-      setThreads((prev) =>
-        prev.map((t) =>
-          t.id === activeThreadId
-            ? {
-                ...t,
-                assignedTo: user?.name || 'Eu',
-                assignedToId: user?.id || 'me',
-                queue: 'Meus',
-              }
-            : t,
-        ),
-      )
+      if (updatedTicket?.id) {
+        const normalized = normalizeTicketToThread(updatedTicket)
+
+        setThreads((prev) => {
+          const next = prev.map((t) => (t.id === activeThreadId ? { ...t, ...normalized } : t))
+          return next
+        })
+
+        if (queue === 'Espera') {
+          setThreads((prev) => prev.filter((t) => t.id !== activeThreadId))
+          setActiveThreadId(null)
+        }
+      } else {
+        setThreads((prev) =>
+          prev.map((t) =>
+            t.id === activeThreadId
+              ? {
+                  ...t,
+                  assignedTo: user?.name || 'Eu',
+                  assignedToId: user?.id || null,
+                  queue: 'Meus',
+                }
+              : t,
+          ),
+        )
+      }
 
       message.success('Conversa assumida com sucesso')
     } catch (err) {
@@ -118,75 +217,6 @@ export default function VisualChatPage() {
     setHistoryOpen(true)
   }
 
-  const activeContact = useMemo(() => {
-    if (!activeThread) return null
-    return contactsRef.current.get(activeThread.contactId) || null
-  }, [activeThread])
-
-  const activeMessages = useMemo(() => {
-    if (!activeThreadId) return []
-    return messagesByThread[activeThreadId] || []
-  }, [messagesByThread, activeThreadId])
-
-  function normalizeTicketToThread(t) {
-    if (t?.contact?.id) {
-      contactsRef.current.set(t.contact.id, {
-        id: t.contact.id,
-        name: t.contact.name || null,
-        phone: t.contact.phoneE164 || null,
-        waId: t.contact.waId || null,
-      })
-    }
-
-    const last = t?.messages?.[0] || null
-
-    return {
-      id: t.id,
-      contactId: t.contactId,
-      assignedToId: t.assignedToId || null,
-      toWaId: t.contact?.waId || null,
-
-      title: t.contact?.name || t.contact?.waId || 'Sem nome',
-      lastMessage: last?.text || '',
-      updatedAt: t.lastMessageAt
-        ? new Date(t.lastMessageAt).toLocaleTimeString('pt-BR').slice(0, 5)
-        : '',
-      unread: t.unreadCount || 0,
-
-      queue: t.assignedToId ? 'Meus' : 'Espera',
-      assignedTo: t.assignedTo?.name || null,
-
-      status: t.status || 'OPEN',
-      waWindowUntil: t.waWindowUntil || null,
-    }
-  }
-
-  function normalizeMessage(m) {
-    return {
-      id: m.id,
-      threadId: m.ticketId,
-      author: m.direction === 'OUT' ? 'me' : 'them',
-      type:
-        m.type === 'IMAGE'
-          ? 'image'
-          : m.type === 'AUDIO'
-            ? 'audio'
-            : m.type === 'DOCUMENT'
-              ? 'document'
-              : 'text',
-      text: m.text || undefined,
-      url: m.mediaUrl || undefined,
-      caption: null,
-      audioDuration: undefined,
-      at: new Date(m.createdAt).toLocaleString('pt-BR'),
-      status: m.status,
-      createdAt: m.createdAt, // ✅ ajuda o bubble a formatar hora
-    }
-  }
-
-  // =========================
-  // 1) Carregar tickets
-  // =========================
   useEffect(() => {
     let aborted = false
 
@@ -194,8 +224,12 @@ export default function VisualChatPage() {
       try {
         setLoadingThreads(true)
 
-        // ✅ importante: trazer TODOS
-        const res = await listTickets({ queue: 'todos', take: 100, skip: 0 })
+        const res = await listTickets({
+          queue: String(queue || 'Meus').toLowerCase(),
+          take: 100,
+          skip: 0,
+        })
+
         const items = pickTicketsItems(res)
         const normalized = items.map(normalizeTicketToThread)
 
@@ -204,28 +238,24 @@ export default function VisualChatPage() {
         setThreads(normalized)
 
         setActiveThreadId((prev) => {
-          const next =
-            prev && normalized.some((t) => t.id === prev) ? prev : normalized[0]?.id || null
-          return next
+          if (prev && normalized.some((t) => t.id === prev)) return prev
+          return normalized[0]?.id || null
         })
       } catch (err) {
         console.error('[VisualChat] loadThreads error:', err)
         message.error(getApiErrorMessage(err))
       } finally {
-        setLoadingThreads(false)
+        if (!aborted) setLoadingThreads(false)
       }
     }
 
-    loadThreads()
+    if (user?.id) loadThreads()
 
     return () => {
       aborted = true
     }
-  }, [])
+  }, [queue, user?.id])
 
-  // =========================
-  // 2) Carregar mensagens do ticket ativo
-  // =========================
   useEffect(() => {
     if (!activeThreadId) return
 
@@ -245,19 +275,17 @@ export default function VisualChatPage() {
         console.error('[VisualChat] loadMessages error:', err)
         message.error(getApiErrorMessage(err))
       } finally {
-        setLoadingMessages(false)
+        if (!aborted) setLoadingMessages(false)
       }
     }
 
     loadMessages()
+
     return () => {
       aborted = true
     }
   }, [activeThreadId])
 
-  // =========================
-  // 3) SSE - tempo real
-  // =========================
   useEffect(() => {
     try {
       const es = openInboxStream()
@@ -268,19 +296,31 @@ export default function VisualChatPage() {
           const payload = JSON.parse(ev.data)
           const ticket = payload.ticket
           const msg = payload.message
+
           if (!ticket?.id || !msg?.id) return
 
           const threadId = ticket.id
           const normalizedMsg = normalizeMessage(msg)
 
+          const normalizedThread = normalizeTicketToThread({
+            ...ticket,
+            messages: [{ text: msg.text || '' }],
+            lastMessageAt: ticket.lastMessageAt || msg.createdAt,
+          })
+
+          const threadBelongsToCurrentQueue =
+            queue === 'Meus'
+              ? normalizedThread.assignedToId === user?.id
+              : queue === 'Espera'
+                ? !normalizedThread.assignedToId
+                : true
+
           setThreads((prev) => {
             const exists = prev.some((t) => t.id === threadId)
 
-            const normalizedThread = normalizeTicketToThread({
-              ...ticket,
-              messages: [{ text: msg.text || '' }],
-              lastMessageAt: ticket.lastMessageAt || msg.createdAt,
-            })
+            if (!threadBelongsToCurrentQueue) {
+              return prev.filter((t) => t.id !== threadId)
+            }
 
             if (!exists) return [normalizedThread, ...prev]
 
@@ -288,22 +328,38 @@ export default function VisualChatPage() {
               t.id === threadId
                 ? {
                     ...t,
+                    ...normalizedThread,
                     lastMessage: msg.text || t.lastMessage,
-                    updatedAt: new Date(msg.createdAt).toLocaleTimeString('pt-BR').slice(0, 5),
+                    updatedAt: formatTime(msg.createdAt),
                   }
                 : t,
             )
 
             const idx = updated.findIndex((t) => t.id === threadId)
             if (idx <= 0) return updated
+
             const [item] = updated.splice(idx, 1)
             return [item, ...updated]
           })
 
           setMessagesByThread((prev) => {
             const arr = prev[threadId] || []
+
             if (arr.some((m) => m.id === normalizedMsg.id)) return prev
-            return { ...prev, [threadId]: [...arr, normalizedMsg] }
+
+            const withoutOptimisticDuplicate = arr.filter(
+              (m) =>
+                !(
+                  m.optimistic &&
+                  m.author === normalizedMsg.author &&
+                  (m.text || '') === (normalizedMsg.text || '')
+                ),
+            )
+
+            return {
+              ...prev,
+              [threadId]: [...withoutOptimisticDuplicate, normalizedMsg],
+            }
           })
         } catch (e) {
           console.error('[VisualChat] SSE parse error:', e)
@@ -318,44 +374,51 @@ export default function VisualChatPage() {
     } catch (err) {
       console.error('[VisualChat] SSE init failed:', err)
     }
-  }, [])
+  }, [queue, user?.id])
 
-  // =========================
-  // Presença (mock)
-  // =========================
   function onChangePresence(nextPresence) {
-    console.log('mudei')
-    // setUser((prev) => ({ ...prev, presence: nextPresence }))
+    console.log('presence changed:', nextPresence)
   }
 
-  // =========================
-  // Enviar mensagem (optimistic)
-  // =========================
   async function sendMessageReal(text) {
     if (!activeThreadId || !activeThread) return
 
-    // ✅ AUTO-ASSIGN ao responder se estiver em "Espera"
     const shouldAutoAssign = activeThread.queue === 'Espera' || !activeThread.assignedTo
 
     if (shouldAutoAssign) {
       try {
         const assignResp = await assignTicket(activeThreadId)
-        setQueue('Meus')
-        const assignedTicket = assignResp?.ticket || null
+        const assignedTicket = assignResp?.ticket || assignResp?.data || assignResp || null
 
-        if (assignedTicket) {
+        if (assignedTicket?.id) {
           const normalizedAssigned = normalizeTicketToThread(assignedTicket)
 
           setThreads((prev) =>
             prev.map((t) => (t.id === activeThreadId ? { ...t, ...normalizedAssigned } : t)),
           )
 
-          // ✅ agora sim, só muda se veio atribuído
-          if (assignedTicket.assignedToId) setQueue('Meus')
+          if (assignedTicket.assignedToId) {
+            setQueue('Meus')
+          }
+        } else {
+          setThreads((prev) =>
+            prev.map((t) =>
+              t.id === activeThreadId
+                ? {
+                    ...t,
+                    assignedTo: user?.name || 'Eu',
+                    assignedToId: user?.id || null,
+                    queue: 'Meus',
+                  }
+                : t,
+            ),
+          )
+          setQueue('Meus')
         }
       } catch (err) {
         console.error('[VisualChat] auto-assign failed:', err)
         message.error(getApiErrorMessage(err))
+        return
       }
     }
 
@@ -375,6 +438,9 @@ export default function VisualChatPage() {
       createdAt: now.toISOString(),
       status: 'SENT',
       optimistic: true,
+      senderName: user?.name || 'Eu',
+      senderUserId: user?.id || null,
+      senderType: 'AGENT',
     }
 
     setMessagesByThread((prev) => ({
@@ -385,7 +451,14 @@ export default function VisualChatPage() {
     setThreads((prev) =>
       prev.map((t) =>
         t.id === activeThreadId
-          ? { ...t, lastMessage: trimmed, updatedAt: now.toLocaleTimeString('pt-BR').slice(0, 5) }
+          ? {
+              ...t,
+              lastMessage: trimmed,
+              updatedAt: formatTime(now),
+              assignedTo: t.assignedTo || user?.name || null,
+              assignedToId: t.assignedToId || user?.id || null,
+              queue: getThreadQueue({ assignedToId: t.assignedToId || user?.id || null }, user?.id),
+            }
           : t,
       ),
     )
@@ -399,7 +472,17 @@ export default function VisualChatPage() {
           ...prev,
           [activeThreadId]: (prev[activeThreadId] || []).map((m) =>
             m.id === optimisticId
-              ? { ...m, id: saved.id, status: saved.status || m.status, optimistic: false }
+              ? {
+                  ...m,
+                  id: saved.id,
+                  status: saved.status || m.status,
+                  optimistic: false,
+                  senderName: saved.senderName || m.senderName,
+                  senderUserId: saved.senderUserId || m.senderUserId,
+                  senderType: saved.senderType || m.senderType,
+                  createdAt: saved.createdAt || m.createdAt,
+                  at: saved.createdAt ? new Date(saved.createdAt).toLocaleString('pt-BR') : m.at,
+                }
               : m,
           ),
         }))
@@ -430,11 +513,14 @@ export default function VisualChatPage() {
   function changeTicket(nextTicket) {
     message.success(`Ticket alterado para ${nextTicket} (mock)`)
   }
+
   function transferThread(agentName) {
     message.success(`Conversa transferida para ${agentName} (mock)`)
   }
+
   function shareThread(action) {
     if (!activeThreadId) return
+
     if (action === 'copy') {
       navigator.clipboard
         .writeText(`visualchat://thread/${activeThreadId}`)
@@ -442,7 +528,10 @@ export default function VisualChatPage() {
         .catch(() => message.error('Não foi possível copiar.'))
       return
     }
-    if (action === 'export') message.info('Export mock (sem backend)')
+
+    if (action === 'export') {
+      message.info('Export mock (sem backend)')
+    }
   }
 
   async function onCreateConversation() {
@@ -452,14 +541,55 @@ export default function VisualChatPage() {
     newForm.resetFields()
   }
 
+  useEffect(() => {
+    let aborted = false
+
+    async function loadAgents() {
+      try {
+        setLoadingAgents(true)
+        const res = await listInboxAgents()
+        const items =
+          res?.items ??
+          res?.data?.items ??
+          (Array.isArray(res?.data) ? res.data : null) ??
+          (Array.isArray(res) ? res : null) ??
+          []
+
+        if (aborted) return
+
+        setAgents(
+          (Array.isArray(items) ? items : []).map((a) => ({
+            id: a.id,
+            name: a.name,
+            email: a.email || null,
+          })),
+        )
+      } catch (err) {
+        console.error('[VisualChat] loadAgents error:', err)
+        message.error(getApiErrorMessage(err))
+      } finally {
+        if (!aborted) setLoadingAgents(false)
+      }
+    }
+
+    loadAgents()
+
+    return () => {
+      aborted = true
+    }
+  }, [])
+
   return (
     <>
       <ChatShell
         user={user}
         presenceOptions={PRESENCE_OPTIONS}
         onChangePresence={onChangePresence}
-        agents={mockAgents}
+        agents={agents}
         threads={threads}
+        queue={queue}
+        onChangeQueue={setQueue}
+        loadingAgents={loadingAgents}
         activeThreadId={activeThreadId}
         onSelectThread={setActiveThreadId}
         contact={activeContact}
@@ -476,10 +606,9 @@ export default function VisualChatPage() {
         loadingThreads={loadingThreads}
         loadingMessages={loadingMessages}
         onNewConversation={() => setNewOpen(true)}
-        queue={queue}
-        onChangeQueue={setQueue}
         onContactUpdated={(updated) => {
           if (!updated?.id) return
+
           contactsRef.current.set(updated.id, {
             id: updated.id,
             name: updated.name || null,
@@ -487,7 +616,6 @@ export default function VisualChatPage() {
             waId: updated.waId || null,
           })
 
-          // atualiza título do ticket atual (e de todos que sejam desse contato)
           setThreads((prev) =>
             prev.map((t) =>
               t.contactId === updated.id ? { ...t, title: updated.name || t.title } : t,
@@ -518,6 +646,7 @@ export default function VisualChatPage() {
           >
             <Input />
           </Form.Item>
+
           <Form.Item
             name="phone"
             label="Telefone"
@@ -572,7 +701,12 @@ export default function VisualChatPage() {
                   maxWidth: '80%',
                 }}
               >
-                <div style={{ fontSize: 13 }}>{m.text || '[mídia]'}</div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{m.text || '[mídia]'}</div>
+
+                {m.author === 'me' && m.senderName ? (
+                  <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>{m.senderName}</div>
+                ) : null}
+
                 <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>{m.at}</div>
               </div>
             ))

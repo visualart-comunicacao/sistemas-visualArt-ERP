@@ -9,8 +9,7 @@ function stringToColor(str = '') {
   for (let i = 0; i < str.length; i += 1) {
     hash = str.charCodeAt(i) + ((hash << 5) - hash)
   }
-  const color = `hsl(${hash % 360}, 65%, 45%)`
-  return color
+  return `hsl(${Math.abs(hash) % 360}, 65%, 45%)`
 }
 
 function getFirstAndLastName(name) {
@@ -39,16 +38,14 @@ function getInitials(name = '') {
 }
 
 function AgentChip({ agent, count, active, onClick }) {
-  const bg = active ? '#6c1bb8' : '#eee'
-
   return (
-    <div className="vc-agent-chip-wrap" onClick={onClick}>
+    <button type="button" className="vc-agent-chip-wrap" onClick={onClick}>
       <Badge count={count} size="small" offset={[-2, 4]}>
         <div
           className={`vc-agent-chip ${active ? 'active' : ''}`}
           style={{
             background: active ? '#6c1bb8' : '#f1f1f1',
-            borderColor: active ? '#6c1bb8' : '#e5e5e5',
+            // borderColor: active ? '#6c1bb8' : '#e5e5e5',
           }}
           title={agent?.name || 'Atendente'}
         >
@@ -69,7 +66,7 @@ function AgentChip({ agent, count, active, onClick }) {
           )}
         </div>
       </Badge>
-    </div>
+    </button>
   )
 }
 
@@ -132,8 +129,9 @@ export default function LeftSidebar({
   activeThreadId,
   onSelectThread,
   loading,
+  queue = 'Todos',
+  onChangeQueue,
 }) {
-  const [tab, setTab] = useState('Todos')
   const [search, setSearch] = useState('')
   const [selectedAgent, setSelectedAgent] = useState('all')
 
@@ -148,22 +146,12 @@ export default function LeftSidebar({
     const map = new Map()
 
     agents.forEach((a) => {
-      map.set(a.id || a.name, 0)
+      map.set(a.id, 0)
     })
 
     threads.forEach((t) => {
-      if (!t.assignedTo) return
-      const found = agents.find(
-        (a) =>
-          a.name === t.assignedTo ||
-          a.id === t.assignedToId ||
-          a.id === t.assignedTo ||
-          a.username === t.assignedTo,
-      )
-      if (!found) return
-
-      const key = found.id || found.name
-      map.set(key, (map.get(key) || 0) + 1)
+      if (!t.assignedToId) return
+      map.set(t.assignedToId, (map.get(t.assignedToId) || 0) + 1)
     })
 
     return map
@@ -172,14 +160,8 @@ export default function LeftSidebar({
   const filteredThreads = useMemo(() => {
     let arr = [...threads]
 
-    if (tab === 'Meus') arr = arr.filter((t) => t.queue === 'Meus')
-    if (tab === 'Espera') arr = arr.filter((t) => t.queue === 'Espera')
-
     if (selectedAgent !== 'all') {
-      const agent = agents.find((a) => (a.id || a.name) === selectedAgent)
-      if (agent) {
-        arr = arr.filter((t) => t.assignedTo && t.assignedTo === agent.name)
-      }
+      arr = arr.filter((t) => t.assignedToId === selectedAgent)
     }
 
     if (search.trim()) {
@@ -199,7 +181,12 @@ export default function LeftSidebar({
     }
 
     return arr
-  }, [threads, tab, selectedAgent, search, agents])
+  }, [threads, selectedAgent, search])
+
+  const visibleAgents = useMemo(() => {
+    if (queue === 'Espera') return []
+    return agents
+  }, [agents, queue])
 
   return (
     <div className="vc-left-sidebar">
@@ -234,8 +221,8 @@ export default function LeftSidebar({
       <div className="vc-tabs-row">
         <button
           type="button"
-          className={`vc-tab-btn ${tab === 'Meus' ? 'active' : ''}`}
-          onClick={() => setTab('Meus')}
+          className={`vc-tab-btn ${queue === 'Meus' ? 'active' : ''}`}
+          onClick={() => onChangeQueue?.('Meus')}
         >
           <span>Meus</span>
           <span className="vc-tab-count">{counts.meus}</span>
@@ -243,8 +230,8 @@ export default function LeftSidebar({
 
         <button
           type="button"
-          className={`vc-tab-btn ${tab === 'Espera' ? 'active' : ''}`}
-          onClick={() => setTab('Espera')}
+          className={`vc-tab-btn ${queue === 'Espera' ? 'active' : ''}`}
+          onClick={() => onChangeQueue?.('Espera')}
         >
           <span>Espera</span>
           <span className="vc-tab-count">{counts.espera}</span>
@@ -252,8 +239,8 @@ export default function LeftSidebar({
 
         <button
           type="button"
-          className={`vc-tab-btn ${tab === 'Todos' ? 'active' : ''}`}
-          onClick={() => setTab('Todos')}
+          className={`vc-tab-btn ${queue === 'Todos' ? 'active' : ''}`}
+          onClick={() => onChangeQueue?.('Todos')}
         >
           <span>Todos</span>
           <span className="vc-tab-count">{counts.todos}</span>
@@ -263,18 +250,18 @@ export default function LeftSidebar({
       <div className="vc-agents-row">
         <AgentChip
           agent={{ name: 'Todos', icon: <AppstoreOutlined /> }}
-          count={threads.length}
+          count={threads.filter((t) => !!t.assignedToId).length}
           active={selectedAgent === 'all'}
           onClick={() => setSelectedAgent('all')}
         />
 
-        {agents.map((agent) => {
-          const key = agent.id || agent.name
+        {visibleAgents.map((agent) => {
+          const key = agent.id
           return (
             <AgentChip
               key={key}
               agent={agent}
-              count={countsByAgent.get(key) || 0}
+              count={countsByAgent.get(key) ?? 0}
               active={selectedAgent === key}
               onClick={() => setSelectedAgent(key)}
             />

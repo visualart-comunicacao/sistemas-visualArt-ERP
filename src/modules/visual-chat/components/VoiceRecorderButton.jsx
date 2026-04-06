@@ -71,7 +71,6 @@ export default function VoiceRecorderButton({
 
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-        console.log('[VisualChat] áudio gravado:', blob)
 
         stopTimer()
         stopStreamTracks()

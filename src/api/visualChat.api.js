@@ -150,3 +150,8 @@ export async function sendTicketAudio(ticketId, file, extra = {}) {
 
   return response.data
 }
+
+export async function listInboxAgents() {
+  const { data } = await http.get('/inbox/agents')
+  return data
+}
