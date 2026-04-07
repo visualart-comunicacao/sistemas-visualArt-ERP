@@ -13,7 +13,7 @@ function formatRecordingTime(totalSeconds) {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-export default function Composer({ ticketId, onSend, onSendImageMock, disabled }) {
+export default function Composer({ ticketId, onSend, onSendAudio, onSendImageMock, disabled }) {
   const [text, setText] = useState('')
   const [internalNote, setInternalNote] = useState(false)
   const [sending, setSending] = useState(false)
@@ -29,6 +29,25 @@ export default function Composer({ ticketId, onSend, onSendImageMock, disabled }
       setSending(true)
       await Promise.resolve(onSend?.(internalNote ? `[NOTA INTERNA] ${v}` : v))
       setText('')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  async function handleRecordedAudio({ file, durationSec, mimeType }) {
+    if (!ticketId || disabled || sending) return
+
+    try {
+      setSending(true)
+      await Promise.resolve(
+        onSendAudio?.({
+          ticketId,
+          file,
+          durationSec,
+          mimeType,
+          internalNote,
+        }),
+      )
     } finally {
       setSending(false)
     }
@@ -149,6 +168,7 @@ export default function Composer({ ticketId, onSend, onSendImageMock, disabled }
             disabled={audioDisabled}
             onRecordingChange={setIsRecording}
             onRecordingTimeChange={setRecordingSeconds}
+            onRecorded={handleRecordedAudio}
           />
 
           <Button

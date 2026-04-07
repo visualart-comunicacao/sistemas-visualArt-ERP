@@ -44,13 +44,12 @@ function toAbsoluteUrl(url) {
   if (!u) return ''
   if (isHttpUrl(u)) return u
 
-  // se vier /uploads/voices/...
   if (u.startsWith('/')) {
-    const base = String(env?.API_URL || '').replace(/\/$/, '')
-    return `${base}${u}`
+    const apiBase = String(env?.API_URL || '').replace(/\/$/, '')
+    const origin = apiBase.replace(/\/api\/v1$/, '')
+    return `${origin}${u}`
   }
 
-  // fallback
   return u
 }
 

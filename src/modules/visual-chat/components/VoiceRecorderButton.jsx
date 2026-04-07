@@ -2,11 +2,36 @@ import { useEffect, useRef, useState } from 'react'
 import { Button, message } from 'antd'
 import { AudioOutlined, StopOutlined } from '@ant-design/icons'
 
+function getSupportedMimeType() {
+  const types = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/ogg;codecs=opus',
+    'audio/ogg',
+    'audio/mp4',
+  ]
+
+  for (const type of types) {
+    if (window.MediaRecorder?.isTypeSupported?.(type)) return type
+  }
+
+  return ''
+}
+
+function getExtensionFromMimeType(mimeType) {
+  if (!mimeType) return 'webm'
+  if (mimeType.includes('ogg')) return 'ogg'
+  if (mimeType.includes('mp4')) return 'm4a'
+  if (mimeType.includes('mpeg')) return 'mp3'
+  return 'webm'
+}
+
 export default function VoiceRecorderButton({
   ticketId,
   disabled,
   onRecordingChange,
   onRecordingTimeChange,
+  onRecorded,
 }) {
   const [isRecording, setIsRecording] = useState(false)
 
@@ -15,6 +40,7 @@ export default function VoiceRecorderButton({
   const chunksRef = useRef([])
   const timerRef = useRef(null)
   const secondsRef = useRef(0)
+  const mimeTypeRef = useRef('audio/webm')
 
   useEffect(() => {
     onRecordingChange?.(isRecording)
@@ -32,6 +58,14 @@ export default function VoiceRecorderButton({
       streamRef.current.getTracks().forEach((track) => track.stop())
       streamRef.current = null
     }
+  }
+
+  function resetState() {
+    stopTimer()
+    stopStreamTracks()
+    setIsRecording(false)
+    secondsRef.current = 0
+    onRecordingTimeChange?.(0)
   }
 
   useEffect(() => {
@@ -53,13 +87,19 @@ export default function VoiceRecorderButton({
   }
 
   async function startRecording() {
-    if (disabled || !ticketId) return
+    if (disabled || !ticketId || isRecording) return
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
 
-      const mediaRecorder = new MediaRecorder(stream)
+      const mimeType = getSupportedMimeType()
+      mimeTypeRef.current = mimeType || 'audio/webm'
+
+      const mediaRecorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream)
+
       mediaRecorderRef.current = mediaRecorder
       chunksRef.current = []
 
@@ -69,15 +109,37 @@ export default function VoiceRecorderButton({
         }
       }
 
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+      mediaRecorder.onstop = async () => {
+        try {
+          const finalMimeType = mimeTypeRef.current || chunksRef.current?.[0]?.type || 'audio/webm'
 
-        stopTimer()
-        stopStreamTracks()
-        setIsRecording(false)
-        onRecordingTimeChange?.(0)
+          const blob = new Blob(chunksRef.current, { type: finalMimeType })
+          const durationSec = Math.max(1, secondsRef.current || 1)
+          const ext = getExtensionFromMimeType(finalMimeType)
 
-        message.success('Áudio gravado com sucesso (mock).')
+          const file = new File([blob], `audio-${Date.now()}.${ext}`, {
+            type: finalMimeType,
+          })
+
+          resetState()
+
+          await onRecorded?.({
+            file,
+            blob,
+            durationSec,
+            mimeType: finalMimeType,
+          })
+        } catch (err) {
+          console.error('[VisualChat] erro ao processar áudio:', err)
+          resetState()
+          message.error('Erro ao processar o áudio gravado.')
+        }
+      }
+
+      mediaRecorder.onerror = (event) => {
+        console.error('[VisualChat] erro no MediaRecorder:', event)
+        resetState()
+        message.error('Erro durante a gravação.')
       }
 
       mediaRecorder.start()
@@ -85,30 +147,30 @@ export default function VoiceRecorderButton({
       startTimer()
     } catch (err) {
       console.error('[VisualChat] erro ao iniciar gravação:', err)
+      resetState()
       message.error('Não foi possível acessar o microfone.')
-      stopTimer()
-      stopStreamTracks()
-      setIsRecording(false)
-      onRecordingTimeChange?.(0)
     }
   }
 
   function stopRecording() {
     try {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop()
-      } else {
-        stopTimer()
-        stopStreamTracks()
-        setIsRecording(false)
-        onRecordingTimeChange?.(0)
+      const recorder = mediaRecorderRef.current
+      console.log('[VoiceRecorderButton] stopRecording state =', recorder?.state)
+
+      if (!recorder) {
+        resetState()
+        return
       }
+
+      if (recorder.state === 'recording') {
+        recorder.stop()
+        return
+      }
+
+      resetState()
     } catch (err) {
       console.error('[VisualChat] erro ao parar gravação:', err)
-      stopTimer()
-      stopStreamTracks()
-      setIsRecording(false)
-      onRecordingTimeChange?.(0)
+      resetState()
       message.error('Erro ao finalizar gravação.')
     }
   }
@@ -116,18 +178,23 @@ export default function VoiceRecorderButton({
   return isRecording ? (
     <Button
       danger
+      type="primary"
       icon={<StopOutlined />}
       onClick={stopRecording}
       htmlType="button"
-      style={{ height: 'auto' }}
-    />
+      style={{ height: 'auto', minWidth: 96 }}
+    >
+      Parar
+    </Button>
   ) : (
     <Button
       icon={<AudioOutlined />}
       onClick={startRecording}
-      // disabled={disabled || !ticketId}
+      disabled={disabled || !ticketId}
       htmlType="button"
-      style={{ height: 'auto' }}
-    />
+      style={{ height: 'auto', minWidth: 96 }}
+    >
+      Áudio
+    </Button>
   )
 }

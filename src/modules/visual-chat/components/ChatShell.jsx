@@ -7,6 +7,7 @@ import ChatHeader from './ChatHeader'
 import MessagesList from './MessagesList'
 import Composer from './Composer'
 import ContactInfoPanel from './ContactInfoPanel'
+import { sendTicketMessage, sendTicketAudio, getApiErrorMessage } from '../../../api/visualChat.api'
 
 export default function ChatShell({
   user,
@@ -80,6 +81,18 @@ export default function ChatShell({
     setRightDrawerOpen(true)
   }
 
+  async function handleSendAudio({ ticketId, file, durationSec, mimeType, internalNote }) {
+    try {
+      await sendTicketAudio(ticketId, file, {
+        durationSec,
+        mimeType,
+        caption: internalNote ? '[NOTA INTERNA]' : undefined,
+      })
+    } catch (err) {
+      throw new Error(getApiErrorMessage(err))
+    }
+  }
+
   const showMobileList = isMobile && !activeThreadId
   const showMobileChat = !isMobile || !!activeThreadId
 
@@ -143,8 +156,10 @@ export default function ChatShell({
 
           <div className="vc-composer">
             <Composer
+              ticketId={activeThreadId}
               onSend={onSendMessage}
               onSendImageMock={onSendMockImage}
+              onSendAudio={handleSendAudio}
               disabled={!activeThreadId}
             />
           </div>

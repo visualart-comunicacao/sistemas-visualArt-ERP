@@ -142,7 +142,7 @@ export async function sendTicketAudio(ticketId, file, extra = {}) {
   if (extra.durationSec != null) formData.append('durationSec', String(extra.durationSec))
   if (extra.mimeType) formData.append('mimeType', extra.mimeType)
 
-  const response = await http.post(`/tickets/${ticketId}/messages/audio`, formData, {
+  const response = await http.post(`/inbox/tickets/${ticketId}/voice`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },

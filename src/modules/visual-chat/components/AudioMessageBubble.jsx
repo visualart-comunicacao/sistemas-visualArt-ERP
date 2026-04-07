@@ -5,7 +5,7 @@ import { CaretRightOutlined, PauseOutlined } from '@ant-design/icons'
 const { Text } = Typography
 
 function fmtTime(sec) {
-  const s = Math.max(0, Math.floor(sec))
+  const s = Math.max(0, Math.floor(Number(sec) || 0))
   const mm = String(Math.floor(s / 60)).padStart(2, '0')
   const ss = String(s % 60).padStart(2, '0')
   return `${mm}:${ss}`
@@ -13,27 +13,52 @@ function fmtTime(sec) {
 
 export default function AudioMessageBubble({ src, durationMs }) {
   const audioRef = useRef(null)
+
   const [playing, setPlaying] = useState(false)
   const [rate, setRate] = useState(1)
   const [cur, setCur] = useState(0)
-  const [dur, setDur] = useState(durationMs ? durationMs / 1000 : 0)
+  const [dur, setDur] = useState(() => (durationMs ? durationMs / 1000 : 0))
 
   const rates = useMemo(() => [1, 1.5, 2], [])
+
+  useEffect(() => {
+    setDur(durationMs ? durationMs / 1000 : 0)
+  }, [durationMs])
 
   useEffect(() => {
     const a = audioRef.current
     if (!a) return
 
+    a.currentTime = 0
+    a.playbackRate = rate
+    setPlaying(false)
+
     const onTime = () => setCur(a.currentTime || 0)
     const onPlay = () => setPlaying(true)
     const onPause = () => setPlaying(false)
-    const onMeta = () => setDur(a.duration || dur || 0)
-    const onEnded = () => setPlaying(false)
+    const onMeta = () => {
+      console.log('durationMs prop =', durationMs)
+      console.log('audio.duration =', a.duration)
+      console.log('src =', src)
+      const realDuration = Number(a.duration)
+      if (Number.isFinite(realDuration) && realDuration > 0) {
+        setDur(realDuration)
+      }
+    }
+    const onEnded = () => {
+      setPlaying(false)
+      setCur(0)
+    }
+
+    const onLoadedData = () => {
+      setCur(0)
+    }
 
     a.addEventListener('timeupdate', onTime)
     a.addEventListener('play', onPlay)
     a.addEventListener('pause', onPause)
     a.addEventListener('loadedmetadata', onMeta)
+    a.addEventListener('loadeddata', onLoadedData)
     a.addEventListener('ended', onEnded)
 
     return () => {
@@ -41,28 +66,29 @@ export default function AudioMessageBubble({ src, durationMs }) {
       a.removeEventListener('play', onPlay)
       a.removeEventListener('pause', onPause)
       a.removeEventListener('loadedmetadata', onMeta)
+      a.removeEventListener('loadeddata', onLoadedData)
       a.removeEventListener('ended', onEnded)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [src])
-
-  useEffect(() => {
-    const a = audioRef.current
-    if (a) a.playbackRate = rate
-  }, [rate])
+  }, [src, rate])
 
   const pct = dur > 0 ? Math.min(100, (cur / dur) * 100) : 0
 
-  function toggle() {
+  async function toggle() {
     const a = audioRef.current
     if (!a) return
-    if (a.paused) a.play()
-    else a.pause()
+
+    try {
+      if (a.paused) await a.play()
+      else a.pause()
+    } catch (err) {
+      console.error('Erro ao reproduzir áudio:', err)
+    }
   }
 
   function seek(e) {
     const a = audioRef.current
     if (!a || !dur) return
+
     const rect = e.currentTarget.getBoundingClientRect()
     const x = Math.min(Math.max(0, e.clientX - rect.left), rect.width)
     const next = (x / rect.width) * dur
@@ -82,7 +108,7 @@ export default function AudioMessageBubble({ src, durationMs }) {
         maxWidth: 360,
         padding: 10,
         borderRadius: 16,
-        background: '#e7f3ff', // ajuste para seu tema
+        background: '#e7f3ff',
       }}
     >
       <audio ref={audioRef} src={src} preload="metadata" />
@@ -92,7 +118,9 @@ export default function AudioMessageBubble({ src, durationMs }) {
           shape="circle"
           icon={playing ? <PauseOutlined /> : <CaretRightOutlined />}
           onClick={toggle}
+          htmlType="button"
         />
+
         <div style={{ flex: 1, padding: '0 10px' }}>
           <div
             onClick={seek}
@@ -121,12 +149,14 @@ export default function AudioMessageBubble({ src, durationMs }) {
               {fmtTime(cur)}
             </Text>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {fmtTime(dur || 0)}
+              {fmtTime(dur)}
             </Text>
           </div>
         </div>
 
-        <Button onClick={cycleRate}>{rate}x</Button>
+        <Button onClick={cycleRate} htmlType="button">
+          {rate}x
+        </Button>
       </Space>
     </div>
   )
